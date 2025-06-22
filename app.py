@@ -18,7 +18,8 @@ load_dotenv()
 # ---------- FUNÇÕES AUXILIARES ----------
 
 def carregar_conhecimento_drexus():
-    with open("DOSSIE_DREXUS_ICE3R_DRE.md", encoding="utf-8") as f:
+
+    with open("dossie_drexus_ice3r_dre.md", encoding="utf-8") as f:
         return f.read()
 
 def gerar_resumo_openai(empresa, responsavel, respostas, medias, rexp, zona, conhecimento_drexus):
@@ -309,6 +310,16 @@ responsavel = st.text_input("Nome do Responsável")
 if not empresa or not responsavel:
     st.info("Preencha o nome da empresa e do responsável para iniciar o diagnóstico.")
     st.stop()
+
+# Novo bloco: Botão para iniciar o questionário
+if "iniciar_questionario" not in st.session_state:
+    st.session_state["iniciar_questionario"] = False
+
+if not st.session_state["iniciar_questionario"]:
+    if st.button("Iniciar Questionário"):
+        st.session_state["iniciar_questionario"] = True
+    else:
+        st.stop()
 
 criar_tabelas()
 
