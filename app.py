@@ -347,6 +347,8 @@ if ultimo:
 
 st.header("Novo Diagnóstico")
 
+# Depois de preencher o dicionário respostas com os sliders:
+# (mantém seu código anterior)
 tabs = st.tabs(list(perguntas.keys()))
 respostas = {}
 for idx, (var, lista_perguntas) in enumerate(perguntas.items()):
@@ -357,8 +359,9 @@ for idx, (var, lista_perguntas) in enumerate(perguntas.items()):
             nota = st.slider(f"{i+1}. {pergunta}", 0, 5, 0, key=f"{var}_{i}")
             respostas[var].append((nota, peso))
 
-# Verifica se todas as perguntas foram respondidas (nenhum valor igual a zero)
+# --- TRECHO QUE CONTROLA O BOTÃO ---
 
+# Verifica se todas as perguntas foram respondidas (nenhum valor igual a zero)
 todas_respondidas = all(
     all(nota != 0 for nota, _ in lista) for lista in respostas.values()
 )
@@ -403,45 +406,6 @@ if st.button("Calcular Rexp", key="calcular_rexp_btn", disabled=not todas_respon
 
 if not todas_respondidas:
     st.info("Responda todas as perguntas para liberar o cálculo do Rexp.")
-
-if st.button("Calcular Rexp"):
-    medias = calcular_medias(respostas)
-    rexp = calcular_rexp(medias)
-    zona = interpretar_rexp(rexp)
-
-    st.success(f"Rexp calculado: **{rexp}**")
-    st.metric("Zona de Maturidade", zona)
-    st.write("Média ponderada das variáveis:", medias)
-
-    dimensoes = calcular_dimensoes(medias)
-    st.subheader("Radar das Dimensões")
-    fig = go.Figure()
-    fig.add_trace(go.Scatterpolar(
-        r=list(dimensoes.values()),
-        theta=list(dimensoes.keys()),
-        fill='toself',
-        name='Maturidade'
-    ))
-    fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0,1])), showlegend=False)
-    st.plotly_chart(fig, use_container_width=True)
-
-    st.subheader("Tabela de Variáveis e Pesos")
-    df = pd.DataFrame([
-        {"Variável": k, "Média Ponderada (0-1)": v}
-        for k, v in medias.items()
-    ])
-    st.dataframe(df, use_container_width=True)
-
-    # Resetar resumo gerado, pois houve novo cálculo
-    st.session_state["resumo_gerado"] = False
-    st.session_state["dados_resultado"] = {
-        "empresa": empresa,
-        "responsavel": responsavel,
-        "respostas": respostas,
-        "medias": medias,
-        "rexp": rexp,
-        "zona": zona
-    }
 
 # Só mostra botão de resumo se já calculou e não gerou ainda
 
