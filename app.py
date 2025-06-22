@@ -305,8 +305,9 @@ st.sidebar.markdown("**Projeto DREXUS ICE³-R + DRE**")
 #st.sidebar.markdown("Powered by Streamlit + PostgreSQL + Plotly")
 #st.sidebar.markdown("[Manual e documentação](https://github.com/seu-usuario/DREXUS)")
 
-empresa = st.text_input("Nome da Empresa").strip().lower()
-responsavel = st.text_input("Nome do Responsável").strip().lower()
+
+empresa = st.text_input("Nome da Empresa", key="empresa_input").strip().lower()
+responsavel = st.text_input("Nome do Responsável", key="responsavel_input").strip().lower()
 
 if not empresa or not responsavel:
     st.info("Preencha o nome da empresa e do responsável para iniciar o diagnóstico.")
@@ -325,8 +326,6 @@ if not st.session_state["iniciar_questionario"]:
 criar_tabelas()
 
 # Verifica se já existe diagnóstico:
-
-st.write(f"Buscando por empresa: '{empresa}', responsável: '{responsavel}'")
 
 ultimo = buscar_ultimo_diagnostico(empresa, responsavel)
 if ultimo:
@@ -355,6 +354,7 @@ st.header("Novo Diagnóstico")
 
 # Depois de preencher o dicionário respostas com os sliders:
 # (mantém seu código anterior)
+
 tabs = st.tabs(list(perguntas.keys()))
 respostas = {}
 for idx, (var, lista_perguntas) in enumerate(perguntas.items()):
@@ -362,7 +362,20 @@ for idx, (var, lista_perguntas) in enumerate(perguntas.items()):
         st.subheader(f"{var}")
         respostas[var] = []
         for i, (pergunta, peso) in enumerate(lista_perguntas):
-            nota = st.slider(f"{i+1}. {pergunta}", 0, 5, 0, key=f"{var}_{i}")
+            slider_key = f"{var}_{i}"
+            valor_inicial = 0
+            # Se já existe diagnóstico anterior, preenche o valor inicial
+            if ultimo and var in ultimo and len(ultimo[var]) > i:
+                valor_inicial = ultimo[var][i][0]
+            # Garante que o valor inicial só é setado se ainda não existe na session_state
+            if slider_key not in st.session_state:
+                st.session_state[slider_key] = valor_inicial
+            nota = st.slider(
+                f"{i+1}. {pergunta}",
+                0, 5,
+                st.session_state[slider_key],
+                key=slider_key
+            )
             respostas[var].append((nota, peso))
 
 # --- TRECHO QUE CONTROLA O BOTÃO ---
@@ -429,15 +442,24 @@ if st.session_state.get("resumo_gerado", False):
     st.markdown(st.session_state["resumo"])
     if st.button("Gravar diagnóstico no banco de dados"):
         dados = st.session_state["dados_resultado"]
-        st.write("Gravando:", dados)
         salvar_diagnostico(dados["empresa"], dados["responsavel"], dados["respostas"])
         # Opcional: Limpar estado para novo diagnóstico
         st.session_state["resumo_gerado"] = False
         st.session_state["dados_resultado"] = None
-        
+
+        # Botão para resetar tudo e voltar ao início
+
     if st.button("Novo Diagnóstico"):
         st.session_state["iniciar_questionario"] = False
         st.session_state["resumo_gerado"] = False
         st.session_state["dados_resultado"] = None
         st.session_state["resumo"] = ""
+        st.session_state["empresa_input"] = ""
+        st.session_state["responsavel_input"] = ""
+        # Limpa sliders:
+        for var, lista_perguntas in perguntas.items():
+            for i in range(len(lista_perguntas)):
+                slider_key = f"{var}_{i}"
+                if slider_key in st.session_state:
+                    del st.session_state[slider_key]
         st.experimental_rerun()
