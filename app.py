@@ -363,9 +363,43 @@ todas_respondidas = all(
     all(nota != 0 for nota, _ in lista) for lista in respostas.values()
 )
 
-if st.button("Calcular Rexp", disabled=not todas_respondidas):
-    # ... seu cálculo do Rexp e exibição dos resultados ...
-    pass  # aqui entra seu código de cálculo
+if st.button("Calcular Rexp", key="calcular_rexp_btn", disabled=not todas_respondidas):
+    medias = calcular_medias(respostas)
+    rexp = calcular_rexp(medias)
+    zona = interpretar_rexp(rexp)
+
+    st.success(f"Rexp calculado: **{rexp}**")
+    st.metric("Zona de Maturidade", zona)
+    st.write("Média ponderada das variáveis:", medias)
+
+    dimensoes = calcular_dimensoes(medias)
+    st.subheader("Radar das Dimensões")
+    fig = go.Figure()
+    fig.add_trace(go.Scatterpolar(
+        r=list(dimensoes.values()),
+        theta=list(dimensoes.keys()),
+        fill='toself',
+        name='Maturidade'
+    ))
+    fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0,1])), showlegend=False)
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.subheader("Tabela de Variáveis e Pesos")
+    df = pd.DataFrame([
+        {"Variável": k, "Média Ponderada (0-1)": v}
+        for k, v in medias.items()
+    ])
+    st.dataframe(df, use_container_width=True)
+
+    st.session_state["resumo_gerado"] = False
+    st.session_state["dados_resultado"] = {
+        "empresa": empresa,
+        "responsavel": responsavel,
+        "respostas": respostas,
+        "medias": medias,
+        "rexp": rexp,
+        "zona": zona
+    }
 
 if not todas_respondidas:
     st.info("Responda todas as perguntas para liberar o cálculo do Rexp.")
