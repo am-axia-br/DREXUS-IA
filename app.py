@@ -397,14 +397,10 @@ if st.button("Calcular Rexp", key="calcular_rexp_btn"):
         st.write(f"{nomes_longos[k]}: {v}")
 
     dimensoes = calcular_dimensoes(medias)
-
-    dimensoes_legiveis = {nomes_longos[k]: v for k, v in dimensoes.items()}
-    
     fig = go.Figure()
-
     fig.add_trace(go.Scatterpolar(
-        r=list(dimensoes_legiveis.values()),
-        theta=list(dimensoes_legiveis.keys()),
+        r=list(dimensoes.values()),
+        theta=list(dimensoes.keys()),
         fill='toself',
         name='Maturidade'
     ))
