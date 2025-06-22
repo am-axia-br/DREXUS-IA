@@ -305,8 +305,8 @@ st.sidebar.markdown("**Projeto DREXUS ICE³-R + DRE**")
 #st.sidebar.markdown("Powered by Streamlit + PostgreSQL + Plotly")
 #st.sidebar.markdown("[Manual e documentação](https://github.com/seu-usuario/DREXUS)")
 
-empresa = st.text_input("Nome da Empresa")
-responsavel = st.text_input("Nome do Responsável")
+empresa = st.text_input("Nome da Empresa").strip().lower()
+responsavel = st.text_input("Nome do Responsável").strip().lower()
 
 if not empresa or not responsavel:
     st.info("Preencha o nome da empresa e do responsável para iniciar o diagnóstico.")
@@ -325,6 +325,9 @@ if not st.session_state["iniciar_questionario"]:
 criar_tabelas()
 
 # Verifica se já existe diagnóstico:
+
+st.write(f"Buscando por empresa: '{empresa}', responsável: '{responsavel}'")
+
 ultimo = buscar_ultimo_diagnostico(empresa, responsavel)
 if ultimo:
     st.info("Diagnóstico anterior encontrado para esta empresa/responsável.")
@@ -344,6 +347,9 @@ if ultimo:
         ))
         fig_last.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0,1])), showlegend=False)
         st.plotly_chart(fig_last, use_container_width=True)
+else:
+    st.warning("Nenhum diagnóstico encontrado para esta empresa/responsável.")
+
 
 st.header("Novo Diagnóstico")
 
@@ -423,8 +429,15 @@ if st.session_state.get("resumo_gerado", False):
     st.markdown(st.session_state["resumo"])
     if st.button("Gravar diagnóstico no banco de dados"):
         dados = st.session_state["dados_resultado"]
+        st.write("Gravando:", dados)
         salvar_diagnostico(dados["empresa"], dados["responsavel"], dados["respostas"])
         # Opcional: Limpar estado para novo diagnóstico
         st.session_state["resumo_gerado"] = False
         st.session_state["dados_resultado"] = None
-
+        
+    if st.button("Novo Diagnóstico"):
+        st.session_state["iniciar_questionario"] = False
+        st.session_state["resumo_gerado"] = False
+        st.session_state["dados_resultado"] = None
+        st.session_state["resumo"] = ""
+        st.experimental_rerun()
