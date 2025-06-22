@@ -2,7 +2,7 @@
 # Estrutura das 70 perguntas e pesos para o diagnóstico ICE³-R + DREXUS
 
 perguntas = {
-    "If – Integridade Funcional": [
+    "If": [
         ("A missão crítica da unidade está claramente definida e operacionalizada?", 0.15),
         ("Os processos essenciais operam sob contingência mínima com autonomia funcional?", 0.10),
         ("A cadeia de decisão se mantém funcional durante eventos extremos?", 0.15),
@@ -14,7 +14,7 @@ perguntas = {
         ("Há indicadores de missão crítica com resposta em tempo real?", 0.10),
         ("A integridade dos processos é percebida e valorizada pela cultura da organização?", 0.05),
     ],
-    "Cm – Capacidade de Modularidade": [
+    "Cm": [
         ("A organização é composta por módulos autônomos?", 0.10),
         ("Os módulos podem operar independentemente se necessário?", 0.10),
         ("Existe flexibilidade para reorganização estrutural?", 0.10),
@@ -26,7 +26,7 @@ perguntas = {
         ("Os módulos têm autonomia de decisão em situações críticas?", 0.10),
         ("A modularidade é percebida como valor estratégico?", 0.10),
     ],
-    "Et – Evolução sob Estresse": [
+    "Et": [
         ("A organização aprende com eventos inesperados?", 0.10),
         ("Há processos para capturar aprendizados de crises?", 0.10),
         ("Mudanças são implementadas rapidamente após eventos críticos?", 0.10),
@@ -38,7 +38,7 @@ perguntas = {
         ("Feedbacks de evolução são sistemáticos?", 0.10),
         ("A evolução é percebida como diferencial competitivo?", 0.10),
     ],
-    "DREq – Densidade de DREs": [
+    "DREq": [
         ("A organização tem histórico de decisões regenerativas?", 0.10),
         ("As DREs são documentadas sistematicamente?", 0.10),
         ("Há indicadores de densidade de DREs?", 0.10),
@@ -50,7 +50,7 @@ perguntas = {
         ("As DREs impactam processos-chave?", 0.10),
         ("A densidade de DREs é percebida como estratégica?", 0.10),
     ],
-    "Lc – Lógica Contextual": [
+    "Lc": [
         ("A organização identifica corretamente seu contexto de atuação?", 0.10),
         ("As decisões consideram variáveis contextuais?", 0.10),
         ("Há análise contínua de contexto?", 0.10),
@@ -62,7 +62,7 @@ perguntas = {
         ("As equipes compreendem o contexto em que atuam?", 0.10),
         ("A lógica contextual é vista como diferencial?", 0.10),
     ],
-    "Im – Impacto Sistêmico das DREs": [
+    "Im": [
         ("As DREs geram impacto além da organização?", 0.10),
         ("O impacto é monitorado sistematicamente?", 0.10),
         ("Há indicadores de impacto sistêmico?", 0.10),
@@ -74,7 +74,7 @@ perguntas = {
         ("O impacto é revisado periodicamente?", 0.10),
         ("O impacto sistêmico é visto como valor?", 0.10),
     ],
-    "Pv – Propósito Vivo": [
+    "Pv": [
         ("A organização tem um propósito claro e vivo?", 0.10),
         ("O propósito é comunicado a todos?", 0.10),
         ("O propósito é revisado periodicamente?", 0.10),
@@ -86,14 +86,4 @@ perguntas = {
         ("O propósito é adaptado quando necessário?", 0.10),
         ("O propósito vivo é reconhecido como diferencial?", 0.10),
     ],
-}
-
-variaveis_siglas = {
-    "If – Integridade Funcional": "If",
-    "Cm – Capacidade de Modularidade": "Cm",
-    "Et – Evolução sob Estresse": "Et",
-    "DREq – Densidade de DREs": "DREq",
-    "Lc – Lógica Contextual": "Lc",
-    "Im – Impacto Sistêmico das DREs": "Im",
-    "Pv – Propósito Vivo": "Pv",
 }
