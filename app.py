@@ -11,10 +11,40 @@ if "resumo_gerado" not in st.session_state:
     st.session_state["resumo_gerado"] = False
 
 # ---------- CONFIGURAÇÕES INICIAIS ----------
+
 st.set_page_config(page_title="Diagnóstico ICE³-R + DREXUS", layout="wide")
 load_dotenv()
 
 # ---------- FUNÇÕES AUXILIARES ----------
+
+def carregar_conhecimento_drexus():
+    with open("DOSSIE_DREXUS_ICE3R_DRE.md", encoding="utf-8") as f:
+        return f.read()
+
+def gerar_resumo_openai(empresa, responsavel, respostas, medias, rexp, zona, conhecimento_drexus):
+    prompt = f"""
+    Empresa: {empresa}
+    Responsável: {responsavel}
+    Respostas brutas: {respostas}
+    Médias das variáveis: {medias}
+    Rexp: {rexp}
+    Zona de maturidade: {zona}
+    Contexto do DREXUS: {conhecimento_drexus}
+
+    Faça um resumo detalhado da situação da empresa, identifique vulnerabilidades e sugira as 5 principais ações prioritárias e objetivas para evolução imediata. Seja claro e prático.
+    """
+    resposta = openai.ChatCompletion.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": "Você é um consultor especialista em organizações regenerativas e maturidade organizacional."},
+            {"role": "user", "content": prompt}
+        ],
+        max_tokens=800,
+        temperature=0.7
+    )
+    return resposta['choices'][0]['message']['content']        
+
+
 def autenticar():
     app_password = os.getenv("APP_PASSWORD")
     if app_password:
@@ -270,8 +300,8 @@ st.title("Diagnóstico ICE³-R + DREXUS")
 st.markdown("Aplicação para diagnóstico de maturidade organizacional regenerativa usando o Teorema ICE³-R + DRE.")
 
 st.sidebar.markdown("**Projeto DREXUS ICE³-R + DRE**")
-st.sidebar.markdown("Powered by Streamlit + PostgreSQL + Plotly")
-st.sidebar.markdown("[Manual e documentação](https://github.com/seu-usuario/DREXUS)")
+#st.sidebar.markdown("Powered by Streamlit + PostgreSQL + Plotly")
+#st.sidebar.markdown("[Manual e documentação](https://github.com/seu-usuario/DREXUS)")
 
 empresa = st.text_input("Nome da Empresa")
 responsavel = st.text_input("Nome do Responsável")
@@ -382,29 +412,3 @@ if st.session_state.get("resumo_gerado", False):
         st.session_state["resumo_gerado"] = False
         st.session_state["dados_resultado"] = None
 
-def gerar_resumo_openai(empresa, responsavel, respostas, medias, rexp, zona, conhecimento_drexus):
-    prompt = f"""
-    Empresa: {empresa}
-    Responsável: {responsavel}
-    Respostas brutas: {respostas}
-    Médias das variáveis: {medias}
-    Rexp: {rexp}
-    Zona de maturidade: {zona}
-    Contexto do DREXUS: {conhecimento_drexus}
-
-    Faça um resumo detalhado da situação da empresa, identifique vulnerabilidades e sugira as 5 principais ações prioritárias e objetivas para evolução imediata. Seja claro e prático.
-    """
-    resposta = openai.ChatCompletion.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "Você é um consultor especialista em organizações regenerativas e maturidade organizacional."},
-            {"role": "user", "content": prompt}
-        ],
-        max_tokens=800,
-        temperature=0.7
-    )
-    return resposta['choices'][0]['message']['content']        
-
-def carregar_conhecimento_drexus():
-    with open("DOSSIE_DREXUS_ICE3R_DRE.md", encoding="utf-8") as f:
-        return f.read()
