@@ -362,11 +362,7 @@ for idx, (var, lista_perguntas) in enumerate(perguntas.items()):
 # --- TRECHO QUE CONTROLA O BOTÃO ---
 
 # Verifica se todas as perguntas foram respondidas (nenhum valor igual a zero)
-todas_respondidas = all(
-    all(nota != 0 for nota, _ in lista) for lista in respostas.values()
-)
-
-if st.button("Calcular Rexp", key="calcular_rexp_btn", disabled=not todas_respondidas):
+if st.button("Calcular Rexp", key="calcular_rexp_btn"):
     medias = calcular_medias(respostas)
     rexp = calcular_rexp(medias)
     zona = interpretar_rexp(rexp)
@@ -403,9 +399,6 @@ if st.button("Calcular Rexp", key="calcular_rexp_btn", disabled=not todas_respon
         "rexp": rexp,
         "zona": zona
     }
-
-if not todas_respondidas:
-    st.info("Responda todas as perguntas para liberar o cálculo do Rexp.")
 
 # Só mostra botão de resumo se já calculou e não gerou ainda
 
