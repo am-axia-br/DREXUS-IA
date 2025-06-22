@@ -23,6 +23,8 @@ def carregar_conhecimento_drexus():
         return f.read()
 
 def gerar_resumo_openai(empresa, responsavel, respostas, medias, rexp, zona, conhecimento_drexus):
+    from openai import OpenAI
+    client = OpenAI()
     prompt = f"""
     Empresa: {empresa}
     Responsável: {responsavel}
@@ -34,7 +36,7 @@ def gerar_resumo_openai(empresa, responsavel, respostas, medias, rexp, zona, con
 
     Faça um resumo detalhado da situação da empresa, identifique vulnerabilidades e sugira as 5 principais ações prioritárias e objetivas para evolução imediata. Seja claro e prático.
     """
-    resposta = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4o",
         messages=[
             {"role": "system", "content": "Você é um consultor especialista em organizações regenerativas e maturidade organizacional."},
@@ -43,8 +45,7 @@ def gerar_resumo_openai(empresa, responsavel, respostas, medias, rexp, zona, con
         max_tokens=800,
         temperature=0.7
     )
-    return resposta['choices'][0]['message']['content']        
-
+    return response.choices[0].message.content     
 
 def autenticar():
     app_password = os.getenv("APP_PASSWORD")
@@ -355,6 +356,19 @@ for idx, (var, lista_perguntas) in enumerate(perguntas.items()):
         for i, (pergunta, peso) in enumerate(lista_perguntas):
             nota = st.slider(f"{i+1}. {pergunta}", 0, 5, 0, key=f"{var}_{i}")
             respostas[var].append((nota, peso))
+
+# Verifica se todas as perguntas foram respondidas (nenhum valor igual a zero)
+
+todas_respondidas = all(
+    all(nota != 0 for nota, _ in lista) for lista in respostas.values()
+)
+
+if st.button("Calcular Rexp", disabled=not todas_respondidas):
+    # ... seu cálculo do Rexp e exibição dos resultados ...
+    pass  # aqui entra seu código de cálculo
+
+if not todas_respondidas:
+    st.info("Responda todas as perguntas para liberar o cálculo do Rexp.")
 
 if st.button("Calcular Rexp"):
     medias = calcular_medias(respostas)
