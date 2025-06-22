@@ -1,0 +1,14 @@
+Manual de Tipos de Decisão – Método DREXUS
+Esta tabela apresenta os principais tipos de decisão estratégicos conforme o Método DREXUS, com foco na aplicação em ambientes complexos e interdependentes. Agora com as variáveis da fórmula Rexp associadas.
+Tipo de Decisão	Descrição	Zona ICE³-R + DRE	Variáveis Rexp	Ferramentas Principais
+Decisão Sob Incerteza Extrema	Ambientes caóticos, com escassez de dados e alta imprevisibilidade.	Degradação / Colapso	Et, DREq, λi	OODA Loop, Cynefin (Caótico), Heurísticas adaptativas
+Decisão de Segunda Ordem	Considera os desdobramentos indiretos e efeitos de longo prazo.	Complexidade / Antifragilidade	Lc, DREq, Pv	Pensamento de Segunda Ordem, Teoria dos Jogos
+Decisão Simulada	Testada previamente por simulações em ambiente controlado.	Prevenção / Resiliência	Im, λc, Pv	Monte Carlo, ABM, Digital Twins, DSS
+Decisão de Alto Impacto Sistêmico	Afeta múltiplos stakeholders e sistemas críticos.	Resiliência / Antifragilidade	If, Cm, Co, λr	Mapas de rede, Análise ICE³-R
+Decisão Delegada e Colaborativa	Compartilhada com base em inteligência coletiva ou competências locais.	Complexidade / Regeneração	Co, λe, DREq	Governança distribuída, Inteligência coletiva
+Decisão Heurística com Ajuste Adaptativo	Baseada em instinto com validação posterior por dados.	Estresse / Prevenção	Et, Lc, Im	Dashboards com feedback, Análise Bayesiana
+Decisão Regenerativa Exponencial (DRE)	Resolve o problema e fortalece o sistema para o futuro.	Regeneração / Antifragilidade	DREq, If, Co, λr	Painel DRE, Análise de segunda ordem
+Decisão Preventiva e Redundante	Cria alternativas e backups para evitar colapsos futuros.	Prevenção / Resiliência	Pv, If, λr	BCP, Diversificação, Redundância
+Decisão Político-Reputacional	Alta exposição pública e sensibilidade institucional.	Complexidade / Regeneração	Co, Lc, Pv	Matriz de stakeholders, Simulação de crise reputacional
+Decisão de Ruptura Estratégica	Muda radicalmente a lógica vigente e inicia novo ciclo.	Antifragilidade / Inovação Radical	DREq, Cm, λc	Disruption matrix, Radar de ruptura
+
