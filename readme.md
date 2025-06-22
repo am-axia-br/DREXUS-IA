@@ -1,6 +1,6 @@
 # DREXUS ICE³-R + DRE Diagnóstico
 
-Aplicação web (Streamlit + Python) para diagnóstico de maturidade organizacional regenerativa, baseada no Teorema ICE³-R + DRE (Decisões Regenerativas Exponenciais). Permite coleta, cálculo, dashboard e armazenamento seguro dos dados em PostgreSQL na nuvem.
+Aplicação web (Streamlit + Python) para diagnóstico de maturidade organizacional regenerativa, baseada no Teorema ICE³-R + DRE (Decisões Regenerativas Exponenciais). Permite coleta, cálculo, dashboard, análise inteligente com IA e armazenamento seguro dos dados em PostgreSQL na nuvem.
 
 ---
 
@@ -10,9 +10,21 @@ Aplicação web (Streamlit + Python) para diagnóstico de maturidade organizacio
 - Cálculo automático do índice Rexp e zona de maturidade
 - Radar visual das 4 dimensões (Cognitiva, Estratégica, Operacional, Cultural)
 - Histórico por organização/empresa
-- Gravação segura dos dados no banco PostgreSQL (Render.com)
-- Pronto para integração com IA/RAG
+- **Resumo inteligente e recomendações de ações** (OpenAI GPT-4o, contexto Drexus)
+- Gravação segura dos dados no banco PostgreSQL (Render.com) _apenas após análise IA_
 - Deploy rápido via Render e integração GitHub
+
+---
+
+## 🧠 Como funciona o fluxo de uso
+
+1. O usuário informa a empresa e o responsável.
+2. Responde ao questionário (navegando entre as abas).
+3. Clica em **Calcular Rexp** — vê resultados, radar e zona de maturidade.
+4. Tem a opção de clicar em **Gerar Resumo e Recomendações Personalizadas**.
+5. O app gera, via IA (OpenAI + contexto Drexus), um diagnóstico detalhado e as 5 principais ações recomendadas.
+6. Só após ler o resumo, o usuário pode clicar em **Gravar diagnóstico no banco de dados**.
+7. O ciclo pode ser repetido, sempre com o diagnóstico inteligente antes de gravar.
 
 ---
 
@@ -57,7 +69,9 @@ DREXUS/
      ```
      DATABASE_URL=postgres://usuario:senha@host:5432/nome_banco
      APP_PASSWORD=sua_senha_segura
+     OPENAI_API_KEY=sua_chave_openai_aqui
      ```
+   - **Atenção:** a variável `OPENAI_API_KEY` é obrigatória para a etapa de resumo inteligente.
 
 4. (Opcional) Crie o banco de dados usando o `schema.sql` no PostgreSQL.
 
@@ -77,32 +91,31 @@ DREXUS/
 3. Configure as variáveis de ambiente:
    - `DATABASE_URL` (string de conexão PostgreSQL da Render)
    - `APP_PASSWORD` (senha de acesso, se desejar)
+   - `OPENAI_API_KEY` (sua chave da OpenAI)
 
 4. Render detecta o `Procfile` e executa:
    ```
    web: streamlit run app.py --server.port=$PORT
    ```
 
-5. Pronto! O app estará no ar, 100% em nuvem.
+5. Pronto! O app estará no ar, 100% em nuvem, com IA ativa.
 
 ---
 
-## 🧠 Uso
+## 🧠 Inteligência Artificial integrada
 
-- Acesse o app.
-- Informe o nome da empresa e responsável.
-- Responda às perguntas, navegue entre as abas.
-- Clique para calcular resultados.
-- Veja o radar e zona de maturidade.
-- Salve no banco se desejar.
+- O diagnóstico apresenta um **resumo personalizado** e recomendações automáticas, baseadas nas respostas, resultados e no conhecimento do DREXUS (arquivo `DOSSIE_DREXUS_ICE3R_DRE.md`).
+- A geração do resumo utiliza a API do OpenAI, com modelo GPT-4o.
+- O usuário só pode gravar no banco após ler o diagnóstico da IA.
 
 ---
 
-## 🔒 Segurança
+## 🛡️ Segurança
 
 - Nunca exponha seu `.env` real no repositório.
 - Use variáveis de ambiente no Render ou serviços similares.
 - O acesso pode ser protegido por senha (`APP_PASSWORD`).
+- Sua chave da OpenAI (`OPENAI_API_KEY`) deve ser mantida secreta.
 
 ---
 
@@ -114,5 +127,5 @@ MIT License.
 
 ## 👨‍💻 Contato
 
-Dúvidas, sugestões ou contribuições? Abra uma issue ou envie um PR!
-
+Dúvidas, sugestões ou contribuições?  
+Abra uma issue ou envie um PR!

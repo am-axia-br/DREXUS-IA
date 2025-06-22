@@ -3,7 +3,12 @@ import pandas as pd
 import plotly.graph_objects as go
 import psycopg2
 import os
+import openai
+
 from dotenv import load_dotenv
+
+if "resumo_gerado" not in st.session_state:
+    st.session_state["resumo_gerado"] = False
 
 # ---------- CONFIGURAÇÕES INICIAIS ----------
 st.set_page_config(page_title="Diagnóstico ICE³-R + DREXUS", layout="wide")
@@ -338,5 +343,68 @@ if st.button("Calcular Rexp"):
     ])
     st.dataframe(df, use_container_width=True)
 
-    if st.checkbox("Desejo gravar os dados no banco de dados"):
-        salvar_diagnostico(empresa, responsavel, respostas)
+    # Resetar resumo gerado, pois houve novo cálculo
+    st.session_state["resumo_gerado"] = False
+    st.session_state["dados_resultado"] = {
+        "empresa": empresa,
+        "responsavel": responsavel,
+        "respostas": respostas,
+        "medias": medias,
+        "rexp": rexp,
+        "zona": zona
+    }
+
+# Só mostra botão de resumo se já calculou e não gerou ainda
+
+if st.session_state.get("dados_resultado") and not st.session_state["resumo_gerado"]:
+    if st.button("Gerar Resumo e Recomendações Personalizadas"):
+        dados = st.session_state["dados_resultado"]
+        conhecimento_drexus = carregar_conhecimento_drexus()
+        resumo = gerar_resumo_openai(
+            dados["empresa"],
+            dados["responsavel"],
+            dados["respostas"],
+            dados["medias"],
+            dados["rexp"],
+            dados["zona"],
+            conhecimento_drexus
+        )
+        st.session_state["resumo"] = resumo
+        st.session_state["resumo_gerado"] = True
+
+if st.session_state.get("resumo_gerado", False):
+    st.subheader("Resumo personalizado da situação da empresa:")
+    st.markdown(st.session_state["resumo"])
+    if st.button("Gravar diagnóstico no banco de dados"):
+        dados = st.session_state["dados_resultado"]
+        salvar_diagnostico(dados["empresa"], dados["responsavel"], dados["respostas"])
+        # Opcional: Limpar estado para novo diagnóstico
+        st.session_state["resumo_gerado"] = False
+        st.session_state["dados_resultado"] = None
+
+def gerar_resumo_openai(empresa, responsavel, respostas, medias, rexp, zona, conhecimento_drexus):
+    prompt = f"""
+    Empresa: {empresa}
+    Responsável: {responsavel}
+    Respostas brutas: {respostas}
+    Médias das variáveis: {medias}
+    Rexp: {rexp}
+    Zona de maturidade: {zona}
+    Contexto do DREXUS: {conhecimento_drexus}
+
+    Faça um resumo detalhado da situação da empresa, identifique vulnerabilidades e sugira as 5 principais ações prioritárias e objetivas para evolução imediata. Seja claro e prático.
+    """
+    resposta = openai.ChatCompletion.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": "Você é um consultor especialista em organizações regenerativas e maturidade organizacional."},
+            {"role": "user", "content": prompt}
+        ],
+        max_tokens=800,
+        temperature=0.7
+    )
+    return resposta['choices'][0]['message']['content']        
+
+def carregar_conhecimento_drexus():
+    with open("DOSSIE_DREXUS_ICE3R_DRE.md", encoding="utf-8") as f:
+        return f.read()
