@@ -241,18 +241,15 @@ perguntas = {
     ],
 }
 
-st.write("DEBUG perguntas:", perguntas)
-
-
 
 nomes_longos = {
-    "If": "If – Integridade Funcional",
-    "Cm": "Cm – Capacidade de Modularidade",
-    "Et": "Et – Evolução sob Estresse",
-    "DREq": "DREq – Densidade de DREs",
-    "Lc": "Lc – Lógica Contextual",
-    "Im": "Im – Impacto Sistêmico das DREs",
-    "Pv": "Pv – Propósito Vivo",
+    "If": "Integridade Funcional",
+    "Cm": "Capacidade de Modularidade",
+    "Et": "Evolução sob Estresse",
+    "DREq": "Densidade de DREs",
+    "Lc": "Lógica Contextual",
+    "Im": "Impacto Sistêmico das DREs",
+    "Pv": "Propósito Vivo",
 }
 
 # ---------- LÓGICA DE CÁLCULO ----------
@@ -363,15 +360,16 @@ st.header("Novo Diagnóstico")
 # Depois de preencher o dicionário respostas com os sliders:
 # (mantém seu código anterior)
 
-tabs = st.tabs([nomes_longos[k] for k in perguntas.keys()])
+tab_names = list(perguntas.keys())  # ["If", "Cm", "Et", "DREq", "Lc", "Im", "Pv"]
+tabs = st.tabs(tab_names)
 
 respostas = {}
 
-for idx, (var, lista_perguntas) in enumerate(perguntas.items()):
+for idx, var in enumerate(tab_names):
     with tabs[idx]:
-        st.subheader(nomes_longos[var]) # ou use um dicionário nomes_longos[var] se quiser mostrar o nome completo
+        st.subheader(nomes_longos[var])  # Nome longo APENAS dentro da aba
         respostas[var] = []
-        for i, (pergunta, peso) in enumerate(lista_perguntas):
+        for i, (pergunta, peso) in enumerate(perguntas[var]):
             slider_key = f"{var}_{i}"
             valor_inicial = 0
             if ultimo and var in ultimo and len(ultimo[var]) > i:
@@ -385,9 +383,6 @@ for idx, (var, lista_perguntas) in enumerate(perguntas.items()):
             respostas[var].append((nota, peso))
 
 # --- TRECHO QUE CONTROLA O BOTÃO ---
-
-st.write("DEBUG respostas:", respostas)
-
 
 # Verifica se todas as perguntas foram respondidas (nenhum valor igual a zero)
 
@@ -473,7 +468,4 @@ if st.button("Novo Diagnóstico"):
     st.session_state["resumo_gerado"] = False
     st.session_state["dados_resultado"] = None
     st.session_state["resumo"] = ""
-    # Limpa campos de texto:
-    st.session_state["empresa_input"] = ""
-    st.session_state["responsavel_input"] = ""
     st.experimental_rerun()
