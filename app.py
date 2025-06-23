@@ -241,6 +241,10 @@ perguntas = {
     ],
 }
 
+st.write("DEBUG perguntas:", perguntas)
+
+
+
 nomes_longos = {
     "If": "If – Integridade Funcional",
     "Cm": "Cm – Capacidade de Modularidade",
@@ -381,6 +385,9 @@ for idx, (var, lista_perguntas) in enumerate(perguntas.items()):
             respostas[var].append((nota, peso))
 
 # --- TRECHO QUE CONTROLA O BOTÃO ---
+
+st.write("DEBUG respostas:", respostas)
+
 
 # Verifica se todas as perguntas foram respondidas (nenhum valor igual a zero)
 
