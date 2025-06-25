@@ -5,6 +5,48 @@ import psycopg2
 import os
 import openai
 
+from ajuda_drexus import ajuda
+
+# --- BOTÃO PARA RESETAR BANCO DE DADOS ---
+def reset_database():
+    conn = conectar_banco()
+    cur = conn.cursor()
+    try:
+        cur.execute("DROP TABLE IF EXISTS respostas_diagnostico CASCADE;")
+        cur.execute("DROP TABLE IF EXISTS organizacoes CASCADE;")
+        cur.execute("""
+        CREATE TABLE organizacoes (
+            id SERIAL PRIMARY KEY,
+            nome TEXT NOT NULL,
+            responsavel TEXT NOT NULL,
+            matricula TEXT NOT NULL,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE respostas_diagnostico (
+            id SERIAL PRIMARY KEY,
+            organizacao_id INTEGER REFERENCES organizacoes(id) ON DELETE CASCADE,
+            variavel VARCHAR(10) NOT NULL,
+            pergunta_numero INTEGER NOT NULL,
+            nota INTEGER CHECK (nota >= 0 AND nota <= 5),
+            peso NUMERIC(4,2),
+            respondido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX idx_org_nome_resp_matricula ON organizacoes (nome, responsavel, matricula);
+        CREATE INDEX idx_respostas_orgid ON respostas_diagnostico (organizacao_id);
+        """)
+        conn.commit()
+        st.success("Banco de dados resetado e recriado com sucesso!")
+    except Exception as e:
+        st.error(f"Erro ao resetar banco de dados: {e}")
+    finally:
+        cur.close()
+        conn.close()
+
+st.sidebar.markdown("**Projeto DREXUS ICE³-R + DRE**")
+if st.sidebar.button("Resetar Banco de Dados"):
+    reset_database()
+
+
 from dotenv import load_dotenv
 
 if "resumo_gerado" not in st.session_state:
@@ -27,12 +69,13 @@ def carregar_conhecimento_drexus():
     with open("dossie_drexus_ice3r_dre.md", encoding="utf-8") as f:
         return f.read()
 
-def gerar_resumo_openai(empresa, responsavel, respostas, medias, rexp, zona, conhecimento_drexus):
+def gerar_resumo_openai(empresa, responsavel, matricula, respostas, medias, rexp, zona, conhecimento_drexus):
     from openai import OpenAI
     client = OpenAI()
     prompt = f"""
     Empresa: {empresa}
     Responsável: {responsavel}
+    Matrícula: {matricula}
     Respostas brutas: {respostas}
     Médias das variáveis: {medias}
     Rexp: {rexp}
@@ -75,6 +118,7 @@ def criar_tabelas():
         id SERIAL PRIMARY KEY,
         nome TEXT NOT NULL,
         responsavel TEXT NOT NULL,
+        matricula TEXT NOT NULL,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE IF NOT EXISTS respostas_diagnostico (
@@ -86,6 +130,8 @@ def criar_tabelas():
         peso NUMERIC(4,2),
         respondido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE INDEX IF NOT EXISTS idx_org_nome_resp_matricula ON organizacoes (nome, responsavel, matricula);
+    CREATE INDEX IF NOT EXISTS idx_respostas_orgid ON respostas_diagnostico (organizacao_id);
     """
     try:
         conn = conectar_banco()
@@ -97,17 +143,16 @@ def criar_tabelas():
     except Exception as e:
         st.error(f"Erro ao criar tabelas: {e}")
 
-def salvar_diagnostico(empresa, responsavel, respostas):
+def salvar_diagnostico(empresa, responsavel, matricula, respostas):
     try:
         conn = conectar_banco()
         cur = conn.cursor()
         cur.execute(
-            "INSERT INTO organizacoes (nome, responsavel) VALUES (%s, %s) RETURNING id",
-            (empresa, responsavel)
+            "INSERT INTO organizacoes (nome, responsavel, matricula) VALUES (%s, %s, %s) RETURNING id",
+            (empresa, responsavel, matricula)
         )
         org_id = cur.fetchone()[0]
         for var, valores in respostas.items():
-            # Agora var já é a sigla ("Im", "Pv", etc)
             for idx, (nota, peso) in enumerate(valores, 1):
                 cur.execute("""
                     INSERT INTO respostas_diagnostico (organizacao_id, variavel, pergunta_numero, nota, peso)
@@ -120,15 +165,15 @@ def salvar_diagnostico(empresa, responsavel, respostas):
     except Exception as e:
         st.error(f"Erro ao salvar no banco: {e}")
 
-def buscar_ultimo_diagnostico(empresa, responsavel):
+def buscar_ultimo_diagnostico(empresa, responsavel, matricula):
     try:
         conn = conectar_banco()
         cur = conn.cursor()
         cur.execute("""
             SELECT o.id FROM organizacoes o
-            WHERE o.nome = %s AND o.responsavel = %s
+            WHERE o.nome = %s AND o.responsavel = %s AND o.matricula = %s
             ORDER BY o.criado_em DESC LIMIT 1
-        """, (empresa, responsavel))
+        """, (empresa, responsavel, matricula))
         org = cur.fetchone()
         if not org:
             return None
@@ -315,9 +360,10 @@ st.sidebar.markdown("**Projeto DREXUS ICE³-R + DRE**")
 
 empresa = st.text_input("Nome da Empresa", key="empresa_input").strip().lower()
 responsavel = st.text_input("Nome do Responsável", key="responsavel_input").strip().lower()
+matricula = st.text_input("Matrícula do Funcionário", key="matricula_input").strip().lower()
 
-if not empresa or not responsavel:
-    st.info("Preencha o nome da empresa e do responsável para iniciar o diagnóstico.")
+if not empresa or not responsavel or not matricula:
+    st.info("Preencha o nome da empresa, do responsável e a matrícula para iniciar o diagnóstico.")
     st.stop()
 
 # Novo bloco: Botão para iniciar o questionário
@@ -334,9 +380,10 @@ criar_tabelas()
 
 # Verifica se já existe diagnóstico:
 
-ultimo = buscar_ultimo_diagnostico(empresa, responsavel)
+ultimo = buscar_ultimo_diagnostico(empresa, responsavel, matricula)
+
 if ultimo:
-    st.info("Diagnóstico anterior encontrado para esta empresa/responsável.")
+    st.info(f"Diagnóstico anterior encontrado para esta empresa/responsável/matrícula ({matricula}).")
     if st.checkbox("Deseja visualizar o diagnóstico anterior?"):
         medias_last = calcular_medias(ultimo)
         rexp_last = calcular_rexp(medias_last)
@@ -368,6 +415,7 @@ respostas = {}
 for idx, var in enumerate(tab_names):
     with tabs[idx]:
         st.subheader(nomes_longos[var])  # Nome longo APENAS dentro da aba
+        st.info(ajuda[var])
         respostas[var] = []
         for i, (pergunta, peso) in enumerate(perguntas[var]):
             slider_key = f"{var}_{i}"
@@ -422,6 +470,7 @@ if st.button("Calcular Rexp", key="calcular_rexp_btn"):
     st.session_state["dados_resultado"] = {
         "empresa": empresa,
         "responsavel": responsavel,
+        "matricula": matricula,
         "respostas": respostas,
         "medias": medias,
         "rexp": rexp,
@@ -437,12 +486,14 @@ if st.session_state.get("dados_resultado") and not st.session_state["resumo_gera
         resumo = gerar_resumo_openai(
             dados["empresa"],
             dados["responsavel"],
+            dados["matricula"],
             dados["respostas"],
             dados["medias"],
             dados["rexp"],
             dados["zona"],
             conhecimento_drexus
         )
+        
         st.session_state["resumo"] = resumo
         st.session_state["resumo_gerado"] = True
 
@@ -451,8 +502,7 @@ if st.session_state.get("resumo_gerado", False):
     st.markdown(st.session_state["resumo"])
     if st.button("Gravar diagnóstico no banco de dados"):
         dados = st.session_state["dados_resultado"]
-        salvar_diagnostico(dados["empresa"], dados["responsavel"], dados["respostas"])
-        # Opcional: Limpar estado para novo diagnóstico
+        salvar_diagnostico(dados["empresa"], dados["responsavel"], dados["matricula"], dados["respostas"])        # Opcional: Limpar estado para novo diagnóstico
         st.session_state["resumo_gerado"] = False
         st.session_state["dados_resultado"] = None
 
