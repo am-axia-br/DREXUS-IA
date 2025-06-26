@@ -7,7 +7,18 @@ import openai
 
 from ajuda_drexus import ajuda
 
+st.set_page_config(page_title="Diagnóstico ICE³-R + DREXUS", layout="wide")
+
+def conectar_banco():
+    try:
+        conn = psycopg2.connect(os.getenv("DATABASE_URL"))
+        return conn
+    except Exception as e:
+        st.error(f"Erro ao conectar ao banco de dados: {e}")
+        st.stop()
+
 # --- BOTÃO PARA RESETAR BANCO DE DADOS ---
+
 def reset_database():
     conn = conectar_banco()
     cur = conn.cursor()
@@ -59,7 +70,6 @@ if "empresa_input" not in st.session_state:
 if "responsavel_input" not in st.session_state:
     st.session_state["responsavel_input"] = ""
 
-st.set_page_config(page_title="Diagnóstico ICE³-R + DREXUS", layout="wide")
 load_dotenv()
 
 # ---------- FUNÇÕES AUXILIARES ----------
@@ -102,14 +112,6 @@ def autenticar():
         if senha != app_password:
             st.warning("Acesso restrito. Informe a senha correta.")
             st.stop()
-
-def conectar_banco():
-    try:
-        conn = psycopg2.connect(os.getenv("DATABASE_URL"))
-        return conn
-    except Exception as e:
-        st.error(f"Erro ao conectar ao banco de dados: {e}")
-        st.stop()
 
 def criar_tabelas():
     # Executa o schema.sql se desejar garantir a estrutura
