@@ -246,7 +246,7 @@ def buscar_media_empresa(nome_empresa):
         
         if not org_ids:
             st.error(f"Nenhum registro encontrado para a empresa '{nome_empresa}'")
-            return None
+            return None, 0
             
         # Para cada variável e número de pergunta, calcula a média das notas
         medias_perguntas = {}
@@ -521,7 +521,7 @@ if st.session_state.get("modo_diagnostico_empresa", False):
                                     disabled=True  # Sliders bloqueados, apenas para visualização
                                 )
                     
-                    # CORREÇÃO PRINCIPAL: Modificação do sistema de geração de resumo
+                    # CORREÇÃO PRINCIPAL: Substituição do formulário por um botão direto
                     st.markdown("### Análise da Empresa")
                     
                     # Verificamos se já existe um resumo gerado
@@ -536,47 +536,43 @@ if st.session_state.get("modo_diagnostico_empresa", False):
                             st.session_state["resumo_empresa_gerado"] = False
                             st.rerun()
                     else:
-                        # Usando formulário para garantir captura de estado
-                        with st.form("resumo_form"):
-                            st.write("Clique no botão abaixo para gerar uma análise detalhada com base nos dados agregados")
-                            gerar_resumo = st.form_submit_button("Gerar Resumo e Recomendações", use_container_width=True)
-                            
-                            if gerar_resumo:
+                        # Botão DIRETO, sem formulário
+                        if st.button("Gerar Resumo e Recomendações", key="btn_resumo_direto"):
+                            try:
                                 with st.spinner("Gerando análise completa..."):
-                                    try:
-                                        # Verificamos explicitamente todos os dados necessários
-                                        if not respostas_medias or not medias or not rexp or not zona:
-                                            st.error("Dados incompletos para gerar análise.")
-                                            st.stop()  # Corrigido: usar st.stop() em vez de return
-                                        
-                                        # Log para depuração
-                                        st.write("Carregando conhecimento DREXUS...")
-                                        conhecimento_drexus = carregar_conhecimento_drexus()
-                                        
-                                        st.write("Consultando OpenAI para análise...")
-                                        resumo = gerar_resumo_openai(
-                                            empresa_nome, 
-                                            "Diagnóstico Agregado",
-                                            "N/A", 
-                                            respostas_medias,
-                                            medias, 
-                                            rexp,
-                                            zona,
-                                            conhecimento_drexus
-                                        )
-                                        
-                                        # Salvar resultado na sessão
-                                        st.session_state["resumo_empresa"] = resumo
-                                        st.session_state["resumo_empresa_gerado"] = True
-                                        
-                                        # Mostrar resultado imediatamente
-                                        st.subheader("Análise Agregada da Empresa:")
-                                        st.markdown(resumo)
-                                        
-                                    except Exception as e:
-                                        st.error(f"Erro ao gerar análise: {str(e)}")
-                                        st.code(traceback.format_exc())
-                                        st.info("Dica: verifique se a variável de ambiente OPENAI_API_KEY está configurada corretamente")
+                                    # Verificamos explicitamente todos os dados necessários
+                                    if not respostas_medias or not medias or not rexp or not zona:
+                                        st.error("Dados incompletos para gerar análise.")
+                                        st.stop()
+                                    
+                                    # Log para depuração
+                                    st.info("Carregando conhecimento DREXUS...")
+                                    conhecimento_drexus = carregar_conhecimento_drexus()
+                                    
+                                    st.info("Consultando OpenAI para análise...")
+                                    resumo = gerar_resumo_openai(
+                                        empresa_nome, 
+                                        "Diagnóstico Agregado",
+                                        "N/A", 
+                                        respostas_medias,
+                                        medias, 
+                                        rexp,
+                                        zona,
+                                        conhecimento_drexus
+                                    )
+                                    
+                                    # Salvar resultado na sessão
+                                    st.session_state["resumo_empresa"] = resumo
+                                    st.session_state["resumo_empresa_gerado"] = True
+                                    
+                                    # Mostrar resultado imediatamente
+                                    st.subheader("Análise Agregada da Empresa:")
+                                    st.markdown(resumo)
+                                    
+                            except Exception as e:
+                                st.error(f"Erro ao gerar análise: {str(e)}")
+                                st.code(traceback.format_exc())
+                                st.info("Dica: verifique se a variável de ambiente OPENAI_API_KEY está configurada corretamente")
         else:
             st.warning("Por favor, digite o nome da empresa.")
     
@@ -717,33 +713,29 @@ if st.button("Calcular Rexp", key="calcular_rexp_btn"):
     }
 
 # Só mostra botão de resumo se já calculou e não gerou ainda
-
+# Também substituindo o formulário por um botão direto no diagnóstico individual
 if st.session_state.get("dados_resultado") and not st.session_state["resumo_gerado"]:
-    with st.form("resumo_individual_form"):
-        st.write("Clique no botão abaixo para gerar uma análise personalizada")
-        gerar_resumo = st.form_submit_button("Gerar Resumo e Recomendações Personalizadas", use_container_width=True)
-        
-        if gerar_resumo:
-            with st.spinner("Gerando análise e recomendações..."):
-                dados = st.session_state["dados_resultado"]
-                conhecimento_drexus = carregar_conhecimento_drexus()
-                resumo = gerar_resumo_openai(
-                    dados["empresa"],
-                    dados["responsavel"],
-                    dados["matricula"],
-                    dados["respostas"],
-                    dados["medias"],
-                    dados["rexp"],
-                    dados["zona"],
-                    conhecimento_drexus
-                )
-                
-                st.session_state["resumo"] = resumo
-                st.session_state["resumo_gerado"] = True
-                
-                # Mostrar resultado imediatamente
-                st.subheader("Resumo personalizado da situação da empresa:")
-                st.markdown(resumo)
+    if st.button("Gerar Resumo e Recomendações Personalizadas", key="btn_resumo_individual"):
+        with st.spinner("Gerando análise e recomendações..."):
+            dados = st.session_state["dados_resultado"]
+            conhecimento_drexus = carregar_conhecimento_drexus()
+            resumo = gerar_resumo_openai(
+                dados["empresa"],
+                dados["responsavel"],
+                dados["matricula"],
+                dados["respostas"],
+                dados["medias"],
+                dados["rexp"],
+                dados["zona"],
+                conhecimento_drexus
+            )
+            
+            st.session_state["resumo"] = resumo
+            st.session_state["resumo_gerado"] = True
+            
+            # Mostrar resultado imediatamente
+            st.subheader("Resumo personalizado da situação da empresa:")
+            st.markdown(resumo)
 
 if st.session_state.get("resumo_gerado", False):
     st.subheader("Resumo personalizado da situação da empresa:")
