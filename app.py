@@ -60,13 +60,17 @@ if st.sidebar.button("Resetar Banco de Dados"):
 # Botão para diagnóstico agregado da empresa
 if st.sidebar.button("Diagnóstico da Empresa"):
     st.session_state["modo_diagnostico_empresa"] = True
-    st.rerun()  # Substituído por st.rerun()
+    st.rerun()
 
 
 from dotenv import load_dotenv
 
 if "resumo_gerado" not in st.session_state:
     st.session_state["resumo_gerado"] = False
+
+# Variável para controlar o resumo da empresa
+if "resumo_empresa_gerado" not in st.session_state:
+    st.session_state["resumo_empresa_gerado"] = False
 
 # ---------- CONFIGURAÇÕES INICIAIS ----------
 
@@ -428,11 +432,20 @@ if st.session_state.get("modo_diagnostico_empresa", False):
                 if respostas_medias:
                     st.session_state["empresa_atual"] = empresa_nome
                     st.session_state["respostas_medias"] = respostas_medias
+                    # Reset do estado do resumo quando buscamos novos dados
+                    st.session_state["resumo_empresa_gerado"] = False
+                    if "resumo_empresa" in st.session_state:
+                        del st.session_state["resumo_empresa"]
                     
                     # Calcular métricas com base nas médias
                     medias = calcular_medias(respostas_medias)
                     rexp = calcular_rexp(medias)
                     zona = interpretar_rexp(rexp)
+                    
+                    # Salvar os dados calculados no estado da sessão
+                    st.session_state["empresa_medias"] = medias
+                    st.session_state["empresa_rexp"] = rexp
+                    st.session_state["empresa_zona"] = zona
                     
                     # Exibir resultados
                     st.success(f"Rexp calculado: **{rexp}**")
@@ -471,38 +484,62 @@ if st.session_state.get("modo_diagnostico_empresa", False):
                             
                             for i, (pergunta, _) in enumerate(perguntas[var]):
                                 media_nota, _ = respostas_medias[var][i]
-                                # CORREÇÃO: Ajustado parâmetros do slider para float
                                 st.slider(
                                     f"{i+1}. {pergunta}",
-                                    min_value=0.0,  # Agora float
-                                    max_value=5.0,  # Agora float
+                                    min_value=0.0,
+                                    max_value=5.0,
                                     value=float(media_nota),
-                                    step=0.1,  # Definindo step explicitamente
+                                    step=0.1,
                                     key=f"media_{var}_{i}",
                                     disabled=True  # Sliders bloqueados, apenas para visualização
                                 )
                     
-                    # Opção para gerar relatório (similar ao seu código original)
-                    if st.button("Gerar Resumo e Recomendações"):
-                        conhecimento_drexus = carregar_conhecimento_drexus()
-                        resumo = gerar_resumo_openai(
-                            empresa_nome,
-                            "Diagnóstico Agregado", 
-                            "N/A",
-                            respostas_medias,
-                            medias,
-                            rexp,
-                            zona,
-                            conhecimento_drexus
-                        )
+                    # MODIFICAÇÃO: Sistema de geração de resumo para a empresa com gerenciamento de estado
+                    if not st.session_state.get("resumo_empresa_gerado", False):
+                        if st.button("Gerar Resumo e Recomendações", key="gerar_resumo_empresa_btn"):
+                            with st.spinner("Gerando análise e recomendações personalizadas..."):
+                                conhecimento_drexus = carregar_conhecimento_drexus()
+                                resumo = gerar_resumo_openai(
+                                    empresa_nome,
+                                    "Diagnóstico Agregado", 
+                                    "N/A",
+                                    respostas_medias,
+                                    medias,
+                                    rexp,
+                                    zona,
+                                    conhecimento_drexus
+                                )
+                                # Armazenar o resultado na sessão
+                                st.session_state["resumo_empresa"] = resumo
+                                st.session_state["resumo_empresa_gerado"] = True
+                                # Recarregar para mostrar o resultado
+                                st.rerun()
+                    
+                    # Mostrar o resumo se já foi gerado
+                    if st.session_state.get("resumo_empresa_gerado", False):
                         st.subheader("Análise Agregada da Empresa:")
-                        st.markdown(resumo)
+                        st.markdown(st.session_state["resumo_empresa"])
+                        
+                        # Botão para gerar um novo resumo
+                        if st.button("Gerar Novo Resumo", key="gerar_novo_resumo_empresa_btn"):
+                            st.session_state["resumo_empresa_gerado"] = False
+                            if "resumo_empresa" in st.session_state:
+                                del st.session_state["resumo_empresa"]
+                            st.rerun()
         else:
             st.warning("Por favor, digite o nome da empresa.")
     
     if st.button("Voltar ao Diagnóstico Normal"):
         st.session_state["modo_diagnostico_empresa"] = False
-        st.rerun()  # Substituído por st.rerun()
+        # Limpar estados relacionados ao diagnóstico da empresa
+        if "empresa_atual" in st.session_state:
+            del st.session_state["empresa_atual"]
+        if "respostas_medias" in st.session_state:
+            del st.session_state["respostas_medias"]
+        if "resumo_empresa" in st.session_state:
+            del st.session_state["resumo_empresa"]
+        st.session_state["resumo_empresa_gerado"] = False
+        st.rerun()
         
     # Parar o fluxo normal do app
     st.stop()
@@ -671,4 +708,4 @@ if st.button("Novo Diagnóstico"):
     st.session_state["resumo_gerado"] = False
     st.session_state["dados_resultado"] = None
     st.session_state["resumo"] = ""
-    st.rerun()  # Substituído por st.rerun()
+    st.rerun()
