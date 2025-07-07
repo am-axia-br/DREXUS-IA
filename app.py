@@ -277,11 +277,11 @@ def buscar_media_empresa(nome_empresa):
         conn.close()
         
         st.success(f"Dados agregados de {len(org_ids)} diagnósticos da empresa '{nome_empresa}'")
-        return medias_perguntas
+        return medias_perguntas, len(org_ids)  # Retorna também o número de registros encontrados
         
     except Exception as e:
         st.error(f"Erro ao buscar dados da empresa: {e}")
-        return None
+        return None, 0
 
 # ---------- ESTRUTURA DAS PERGUNTAS ----------
 # Para facilitar a leitura, as perguntas são resumidas (adicione todas para produção!)
@@ -451,9 +451,11 @@ if st.session_state.get("modo_diagnostico_empresa", False):
     if st.button("Buscar e Calcular Médias"):
         if empresa_nome:
             with st.spinner("Buscando dados e calculando médias..."):
-                respostas_medias = buscar_media_empresa(empresa_nome)
+                resultado = buscar_media_empresa(empresa_nome)
                 
-                if respostas_medias:
+                if resultado:
+                    respostas_medias, num_registros = resultado
+                    
                     st.session_state["empresa_atual"] = empresa_nome
                     st.session_state["respostas_medias"] = respostas_medias
                     # Reset do estado do resumo quando buscamos novos dados
@@ -474,6 +476,7 @@ if st.session_state.get("modo_diagnostico_empresa", False):
                     # Exibir resultados
                     st.success(f"Rexp calculado: **{rexp}**")
                     st.metric("Zona de Maturidade", zona)
+                    st.info(f"Dados agregados de {num_registros} diagnósticos da empresa '{empresa_nome}'")
                     
                     # Gráfico radar
                     dimensoes = calcular_dimensoes(medias)
@@ -519,7 +522,6 @@ if st.session_state.get("modo_diagnostico_empresa", False):
                                 )
                     
                     # CORREÇÃO PRINCIPAL: Modificação do sistema de geração de resumo
-                    # Agora usando um formulário para garantir que o estado seja preservado
                     st.markdown("### Análise da Empresa")
                     
                     # Verificamos se já existe um resumo gerado
@@ -545,7 +547,7 @@ if st.session_state.get("modo_diagnostico_empresa", False):
                                         # Verificamos explicitamente todos os dados necessários
                                         if not respostas_medias or not medias or not rexp or not zona:
                                             st.error("Dados incompletos para gerar análise.")
-                                            return
+                                            st.stop()  # Corrigido: usar st.stop() em vez de return
                                         
                                         # Log para depuração
                                         st.write("Carregando conhecimento DREXUS...")
@@ -671,8 +673,6 @@ for idx, var in enumerate(tab_names):
 
 # --- TRECHO QUE CONTROLA O BOTÃO ---
 
-# Verifica se todas as perguntas foram respondidas (nenhum valor igual a zero)
-
 if st.button("Calcular Rexp", key="calcular_rexp_btn"):
     medias = calcular_medias(respostas)
     rexp = calcular_rexp(medias)
@@ -751,11 +751,14 @@ if st.session_state.get("resumo_gerado", False):
     if st.button("Gravar diagnóstico no banco de dados"):
         dados = st.session_state["dados_resultado"]
         salvar_diagnostico(dados["empresa"], dados["responsavel"], dados["matricula"], dados["respostas"])
-        st.session_state["resumo_gerado"] = False
-        st.session_state["dados_resultado"] = None
+        st.success("Diagnóstico salvo com sucesso!")
+        # Não limpar estado automaticamente para permitir visualização do resumo
+        if st.button("Limpar e iniciar novo diagnóstico"):
+            st.session_state["resumo_gerado"] = False
+            st.session_state["dados_resultado"] = None
+            st.rerun()
 
-        # Botão para resetar tudo e voltar ao início
-
+# Botão para resetar tudo e voltar ao início
 if st.button("Novo Diagnóstico"):
     for var, lista_perguntas in perguntas.items():
         for i in range(len(lista_perguntas)):
