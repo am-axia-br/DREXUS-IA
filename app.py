@@ -57,6 +57,11 @@ st.sidebar.markdown("**Projeto DREXUS ICE³-R + DRE**")
 if st.sidebar.button("Resetar Banco de Dados"):
     reset_database()
 
+# Botão para diagnóstico agregado da empresa
+if st.sidebar.button("Diagnóstico da Empresa"):
+    st.session_state["modo_diagnostico_empresa"] = True
+    st.experimental_rerun()
+
 
 from dotenv import load_dotenv
 
@@ -196,6 +201,58 @@ def buscar_ultimo_diagnostico(empresa, responsavel, matricula):
         return respostas
     except Exception as e:
         st.error(f"Erro ao buscar diagnóstico anterior: {e}")
+        return None
+
+def buscar_media_empresa(nome_empresa):
+    try:
+        conn = conectar_banco()
+        cur = conn.cursor()
+        
+        # Primeiro, busca todos os IDs da organização com este nome
+        cur.execute("""
+            SELECT id FROM organizacoes
+            WHERE LOWER(nome) = LOWER(%s)
+        """, (nome_empresa.lower(),))
+        
+        org_ids = [row[0] for row in cur.fetchall()]
+        
+        if not org_ids:
+            st.error(f"Nenhum registro encontrado para a empresa '{nome_empresa}'")
+            return None
+            
+        # Para cada variável e número de pergunta, calcula a média das notas
+        medias_perguntas = {}
+        
+        for var in perguntas.keys():
+            medias_perguntas[var] = []
+            
+            for i in range(1, len(perguntas[var]) + 1):
+                cur.execute("""
+                    SELECT AVG(nota) as media_nota, AVG(peso) as media_peso
+                    FROM respostas_diagnostico
+                    WHERE organizacao_id = ANY(%s)
+                    AND variavel = %s
+                    AND pergunta_numero = %s
+                """, (org_ids, var, i))
+                
+                resultado = cur.fetchone()
+                if resultado and resultado[0]:
+                    media_nota = float(resultado[0])
+                    media_peso = float(resultado[1])
+                    medias_perguntas[var].append((media_nota, media_peso))
+                else:
+                    # Se não houver dados, usa o peso padrão e nota zero
+                    peso_padrao = perguntas[var][i-1][1]
+                    medias_perguntas[var].append((0.0, peso_padrao))
+        
+        cur.close()
+        conn.close()
+        
+        st.success(f"Dados agregados de {len(org_ids)} diagnósticos da empresa '{nome_empresa}'")
+        return medias_perguntas
+        
+    except Exception as e:
+        st.error(f"Erro ao buscar dados da empresa: {e}")
         return None
 
 # ---------- ESTRUTURA DAS PERGUNTAS ----------
@@ -352,13 +409,104 @@ def interpretar_rexp(rexp):
 # ---------- INTERFACE PRINCIPAL ----------
 
 autenticar()
+
+# Modo Diagnóstico da Empresa
+if "modo_diagnostico_empresa" not in st.session_state:
+    st.session_state["modo_diagnostico_empresa"] = False
+
+if st.session_state.get("modo_diagnostico_empresa", False):
+    st.title("Diagnóstico Agregado da Empresa")
+    st.markdown("Este diagnóstico calcula a média de todas as respostas dadas pelos funcionários da empresa selecionada.")
+    
+    empresa_nome = st.text_input("Digite o nome da empresa:", "")
+    
+    if st.button("Buscar e Calcular Médias"):
+        if empresa_nome:
+            with st.spinner("Buscando dados e calculando médias..."):
+                respostas_medias = buscar_media_empresa(empresa_nome)
+                
+                if respostas_medias:
+                    st.session_state["empresa_atual"] = empresa_nome
+                    st.session_state["respostas_medias"] = respostas_medias
+                    
+                    # Calcular métricas com base nas médias
+                    medias = calcular_medias(respostas_medias)
+                    rexp = calcular_rexp(medias)
+                    zona = interpretar_rexp(rexp)
+                    
+                    # Exibir resultados
+                    st.success(f"Rexp calculado: **{rexp}**")
+                    st.metric("Zona de Maturidade", zona)
+                    
+                    # Gráfico radar
+                    dimensoes = calcular_dimensoes(medias)
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatterpolar(
+                        r=list(dimensoes.values()),
+                        theta=list(dimensoes.keys()),
+                        fill='toself',
+                        name='Maturidade'
+                    ))
+                    fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0,1])), showlegend=False)
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Tabela de médias por variável
+                    st.subheader("Médias por Dimensão")
+                    df = pd.DataFrame([
+                        {"Variável": nomes_longos[k], "Média Ponderada (0-1)": v}
+                        for k, v in medias.items()
+                    ])
+                    st.dataframe(df, use_container_width=True)
+                    
+                    # Mostrar todos os sliders com as médias calculadas
+                    st.subheader("Detalhamento por Pergunta (Valores Médios)")
+                    
+                    tab_names = list(perguntas.keys())
+                    tabs = st.tabs(tab_names)
+                    
+                    for idx, var in enumerate(tab_names):
+                        with tabs[idx]:
+                            st.subheader(nomes_longos[var])
+                            st.info(ajuda[var])
+                            
+                            for i, (pergunta, _) in enumerate(perguntas[var]):
+                                media_nota, _ = respostas_medias[var][i]
+                                st.slider(
+                                    f"{i+1}. {pergunta}",
+                                    0, 5,
+                                    value=float(media_nota),
+                                    key=f"media_{var}_{i}",
+                                    disabled=True  # Sliders bloqueados, apenas para visualização
+                                )
+                    
+                    # Opção para gerar relatório (similar ao seu código original)
+                    if st.button("Gerar Resumo e Recomendações"):
+                        conhecimento_drexus = carregar_conhecimento_drexus()
+                        resumo = gerar_resumo_openai(
+                            empresa_nome,
+                            "Diagnóstico Agregado", 
+                            "N/A",
+                            respostas_medias,
+                            medias,
+                            rexp,
+                            zona,
+                            conhecimento_drexus
+                        )
+                        st.subheader("Análise Agregada da Empresa:")
+                        st.markdown(resumo)
+        else:
+            st.warning("Por favor, digite o nome da empresa.")
+    
+    if st.button("Voltar ao Diagnóstico Normal"):
+        st.session_state["modo_diagnostico_empresa"] = False
+        st.experimental_rerun()
+        
+    # Parar o fluxo normal do app
+    st.stop()
+
+# Fluxo normal do app continua aqui
 st.title("Diagnóstico ICE³-R + DREXUS")
 st.markdown("Aplicação para diagnóstico de maturidade organizacional regenerativa usando o Teorema ICE³-R + DRE.")
-
-st.sidebar.markdown("**Projeto DREXUS ICE³-R + DRE**")
-#st.sidebar.markdown("Powered by Streamlit + PostgreSQL + Plotly")
-#st.sidebar.markdown("[Manual e documentação](https://github.com/seu-usuario/DREXUS)")
-
 
 empresa = st.text_input("Nome da Empresa", key="empresa_input").strip().lower()
 responsavel = st.text_input("Nome do Responsável", key="responsavel_input").strip().lower()
