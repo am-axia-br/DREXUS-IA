@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import psycopg2
 import os
 import openai
+import time
 
 from ajuda_drexus import ajuda
 
@@ -62,7 +63,6 @@ if st.sidebar.button("Diagnóstico da Empresa"):
     st.session_state["modo_diagnostico_empresa"] = True
     st.rerun()
 
-
 from dotenv import load_dotenv
 
 if "resumo_gerado" not in st.session_state:
@@ -84,35 +84,38 @@ load_dotenv()
 # ---------- FUNÇÕES AUXILIARES ----------
 
 def carregar_conhecimento_drexus():
-
     with open("dossie_drexus_ice3r_dre.md", encoding="utf-8") as f:
         return f.read()
 
 def gerar_resumo_openai(empresa, responsavel, matricula, respostas, medias, rexp, zona, conhecimento_drexus):
-    from openai import OpenAI
-    client = OpenAI()
-    prompt = f"""
-    Empresa: {empresa}
-    Responsável: {responsavel}
-    Matrícula: {matricula}
-    Respostas brutas: {respostas}
-    Médias das variáveis: {medias}
-    Rexp: {rexp}
-    Zona de maturidade: {zona}
-    Contexto do DREXUS: {conhecimento_drexus}
+    try:
+        from openai import OpenAI
+        client = OpenAI()
+        prompt = f"""
+        Empresa: {empresa}
+        Responsável: {responsavel}
+        Matrícula: {matricula}
+        Respostas brutas: {respostas}
+        Médias das variáveis: {medias}
+        Rexp: {rexp}
+        Zona de maturidade: {zona}
+        Contexto do DREXUS: {conhecimento_drexus}
 
-    Faça um resumo detalhado da situação da empresa, identifique vulnerabilidades e sugira as 5 principais ações prioritárias e objetivas para evolução imediata. Seja claro e prático.
-    """
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "Você é um consultor especialista em organizações regenerativas e maturidade organizacional."},
-            {"role": "user", "content": prompt}
-        ],
-        max_tokens=800,
-        temperature=0.7
-    )
-    return response.choices[0].message.content     
+        Faça um resumo detalhado da situação da empresa, identifique vulnerabilidades e sugira as 5 principais ações prioritárias e objetivas para evolução imediata. Seja claro e prático.
+        """
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Você é um consultor especialista em organizações regenerativas e maturidade organizacional."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=800,
+            temperature=0.7
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        st.error(f"Erro ao conectar com a API OpenAI: {str(e)}")
+        return f"Não foi possível gerar o resumo devido a um erro: {str(e)}"
 
 def autenticar():
     app_password = os.getenv("APP_PASSWORD")
@@ -494,38 +497,70 @@ if st.session_state.get("modo_diagnostico_empresa", False):
                                     disabled=True  # Sliders bloqueados, apenas para visualização
                                 )
                     
-                    # MODIFICAÇÃO: Sistema de geração de resumo para a empresa com gerenciamento de estado
-                    if not st.session_state.get("resumo_empresa_gerado", False):
-                        if st.button("Gerar Resumo e Recomendações", key="gerar_resumo_empresa_btn"):
-                            with st.spinner("Gerando análise e recomendações personalizadas..."):
+                    # SOLUÇÃO CORRIGIDA: Botão de resumo com tratamento de erros e feedback aprimorado
+                    resumo_container = st.container()
+                    with resumo_container:
+                        if st.button("Gerar Resumo e Recomendações", key="btn_resumo_direto"):
+                            with st.spinner("Conectando à OpenAI e gerando análise..."):
+                                # Indicadores de progresso
+                                progress_bar = st.progress(0)
+                                status_text = st.empty()
+                                
+                                # Etapa 1: Preparação
+                                status_text.text("Carregando conhecimento DREXUS...")
+                                progress_bar.progress(10)
                                 conhecimento_drexus = carregar_conhecimento_drexus()
-                                resumo = gerar_resumo_openai(
-                                    empresa_nome,
-                                    "Diagnóstico Agregado", 
-                                    "N/A",
-                                    respostas_medias,
-                                    medias,
-                                    rexp,
-                                    zona,
-                                    conhecimento_drexus
-                                )
-                                # Armazenar o resultado na sessão
-                                st.session_state["resumo_empresa"] = resumo
-                                st.session_state["resumo_empresa_gerado"] = True
-                                # Recarregar para mostrar o resultado
-                                st.rerun()
-                    
-                    # Mostrar o resumo se já foi gerado
-                    if st.session_state.get("resumo_empresa_gerado", False):
-                        st.subheader("Análise Agregada da Empresa:")
-                        st.markdown(st.session_state["resumo_empresa"])
+                                time.sleep(0.5)
+                                
+                                # Etapa 2: Gerando resumo
+                                status_text.text(f"Gerando resumo para empresa '{empresa_nome}'...")
+                                progress_bar.progress(30)
+                                
+                                # Executar a chamada OpenAI com tratamento de erro
+                                try:
+                                    resumo = gerar_resumo_openai(
+                                        empresa_nome,
+                                        "Diagnóstico Agregado", 
+                                        "N/A",
+                                        respostas_medias,
+                                        medias,
+                                        rexp,
+                                        zona,
+                                        conhecimento_drexus
+                                    )
+                                    progress_bar.progress(100)
+                                    status_text.text("Resumo gerado com sucesso!")
+                                    time.sleep(0.5)
+                                    
+                                    # Limpar indicadores de progresso
+                                    status_text.empty()
+                                    progress_bar.empty()
+                                    
+                                    # Exibir resumo
+                                    st.subheader("Análise Agregada da Empresa:")
+                                    st.markdown(resumo)
+                                    
+                                    # Guardar no estado para uso posterior
+                                    st.session_state["resumo_empresa"] = resumo
+                                    st.session_state["resumo_empresa_gerado"] = True
+                                    
+                                except Exception as e:
+                                    progress_bar.empty()
+                                    status_text.empty()
+                                    st.error(f"Erro ao gerar resumo: {str(e)}")
+                                    st.warning("Verifique sua conexão com a internet e a configuração da API da OpenAI")
                         
-                        # Botão para gerar um novo resumo
-                        if st.button("Gerar Novo Resumo", key="gerar_novo_resumo_empresa_btn"):
-                            st.session_state["resumo_empresa_gerado"] = False
-                            if "resumo_empresa" in st.session_state:
-                                del st.session_state["resumo_empresa"]
-                            st.rerun()
+                        elif "resumo_empresa" in st.session_state:
+                            # Se já temos um resumo, exibimos
+                            st.subheader("Análise Agregada da Empresa:")
+                            st.markdown(st.session_state["resumo_empresa"])
+                            
+                            if st.button("Gerar Novo Resumo", key="gerar_novo_resumo_btn"):
+                                # Remover o resumo existente
+                                if "resumo_empresa" in st.session_state:
+                                    del st.session_state["resumo_empresa"]
+                                st.session_state["resumo_empresa_gerado"] = False
+                                st.rerun()
         else:
             st.warning("Por favor, digite o nome da empresa.")
     
@@ -671,28 +706,29 @@ if st.button("Calcular Rexp", key="calcular_rexp_btn"):
 
 if st.session_state.get("dados_resultado") and not st.session_state["resumo_gerado"]:
     if st.button("Gerar Resumo e Recomendações Personalizadas"):
-        dados = st.session_state["dados_resultado"]
-        conhecimento_drexus = carregar_conhecimento_drexus()
-        resumo = gerar_resumo_openai(
-            dados["empresa"],
-            dados["responsavel"],
-            dados["matricula"],
-            dados["respostas"],
-            dados["medias"],
-            dados["rexp"],
-            dados["zona"],
-            conhecimento_drexus
-        )
-        
-        st.session_state["resumo"] = resumo
-        st.session_state["resumo_gerado"] = True
+        with st.spinner("Gerando análise e recomendações..."):
+            dados = st.session_state["dados_resultado"]
+            conhecimento_drexus = carregar_conhecimento_drexus()
+            resumo = gerar_resumo_openai(
+                dados["empresa"],
+                dados["responsavel"],
+                dados["matricula"],
+                dados["respostas"],
+                dados["medias"],
+                dados["rexp"],
+                dados["zona"],
+                conhecimento_drexus
+            )
+            
+            st.session_state["resumo"] = resumo
+            st.session_state["resumo_gerado"] = True
 
 if st.session_state.get("resumo_gerado", False):
     st.subheader("Resumo personalizado da situação da empresa:")
     st.markdown(st.session_state["resumo"])
     if st.button("Gravar diagnóstico no banco de dados"):
         dados = st.session_state["dados_resultado"]
-        salvar_diagnostico(dados["empresa"], dados["responsavel"], dados["matricula"], dados["respostas"])        # Opcional: Limpar estado para novo diagnóstico
+        salvar_diagnostico(dados["empresa"], dados["responsavel"], dados["matricula"], dados["respostas"])
         st.session_state["resumo_gerado"] = False
         st.session_state["dados_resultado"] = None
 
