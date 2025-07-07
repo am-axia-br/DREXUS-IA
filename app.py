@@ -60,7 +60,7 @@ if st.sidebar.button("Resetar Banco de Dados"):
 # Botão para diagnóstico agregado da empresa
 if st.sidebar.button("Diagnóstico da Empresa"):
     st.session_state["modo_diagnostico_empresa"] = True
-    st.experimental_rerun()
+    st.rerun()  # Substituído por st.rerun()
 
 
 from dotenv import load_dotenv
@@ -471,10 +471,13 @@ if st.session_state.get("modo_diagnostico_empresa", False):
                             
                             for i, (pergunta, _) in enumerate(perguntas[var]):
                                 media_nota, _ = respostas_medias[var][i]
+                                # CORREÇÃO: Ajustado parâmetros do slider para float
                                 st.slider(
                                     f"{i+1}. {pergunta}",
-                                    0, 5,
+                                    min_value=0.0,  # Agora float
+                                    max_value=5.0,  # Agora float
                                     value=float(media_nota),
+                                    step=0.1,  # Definindo step explicitamente
                                     key=f"media_{var}_{i}",
                                     disabled=True  # Sliders bloqueados, apenas para visualização
                                 )
@@ -499,7 +502,7 @@ if st.session_state.get("modo_diagnostico_empresa", False):
     
     if st.button("Voltar ao Diagnóstico Normal"):
         st.session_state["modo_diagnostico_empresa"] = False
-        st.experimental_rerun()
+        st.rerun()  # Substituído por st.rerun()
         
     # Parar o fluxo normal do app
     st.stop()
@@ -668,4 +671,4 @@ if st.button("Novo Diagnóstico"):
     st.session_state["resumo_gerado"] = False
     st.session_state["dados_resultado"] = None
     st.session_state["resumo"] = ""
-    st.experimental_rerun()
+    st.rerun()  # Substituído por st.rerun()
