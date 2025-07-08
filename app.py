@@ -62,19 +62,20 @@ if st.sidebar.button("Resetar Banco de Dados"):
 # Botão para diagnóstico agregado da empresa
 if st.sidebar.button("Diagnóstico da Empresa"):
     st.session_state["modo_diagnostico_empresa"] = True
+    for key in st.session_state.keys():
+        if key.startswith("media_"):
+            del st.session_state[key]
     st.rerun()
 
 from dotenv import load_dotenv
 
+# Inicialização das variáveis de estado
 if "resumo_gerado" not in st.session_state:
     st.session_state["resumo_gerado"] = False
-
-# Variável para controlar o resumo da empresa
-if "resumo_empresa_gerado" not in st.session_state:
-    st.session_state["resumo_empresa_gerado"] = False
-
-# ---------- CONFIGURAÇÕES INICIAIS ----------
-
+if "resumo_empresa" not in st.session_state:
+    st.session_state["resumo_empresa"] = None
+if "etapa_diagnostico" not in st.session_state:
+    st.session_state["etapa_diagnostico"] = "inicio"
 if "empresa_input" not in st.session_state:
     st.session_state["empresa_input"] = ""
 if "responsavel_input" not in st.session_state:
@@ -373,7 +374,6 @@ perguntas = {
     ],
 }
 
-
 nomes_longos = {
     "If": "Integridade Funcional",
     "Cm": "Capacidade de Modularidade",
@@ -442,16 +442,19 @@ autenticar()
 if "modo_diagnostico_empresa" not in st.session_state:
     st.session_state["modo_diagnostico_empresa"] = False
 
-# Inicializar outras variáveis de estado para o diagnóstico da empresa
-if "resumo_empresa" not in st.session_state:
-    st.session_state["resumo_empresa"] = None
-
 if st.session_state.get("modo_diagnostico_empresa", False):
     st.title("Diagnóstico Agregado da Empresa")
     st.markdown("Este diagnóstico calcula a média de todas as respostas dadas pelos funcionários da empresa selecionada.")
     
+    # Container para resultados - definido ANTES de qualquer interação
+    resultado_container = st.container()
+    resumo_container = st.container()
+    
+    # Entrada do nome da empresa
     empresa_nome = st.text_input("Digite o nome da empresa:", "")
     
+    # Botão para buscar dados
+    busca_realizada = False
     if st.button("Buscar e Calcular Médias"):
         if empresa_nome:
             with st.spinner("Buscando dados e calculando médias..."):
@@ -460,12 +463,9 @@ if st.session_state.get("modo_diagnostico_empresa", False):
                 if resultado:
                     respostas_medias, num_registros = resultado
                     
+                    # Salvar dados no estado da sessão de forma robusta
                     st.session_state["empresa_atual"] = empresa_nome
                     st.session_state["respostas_medias"] = respostas_medias
-                    # Reset do estado do resumo quando buscamos novos dados
-                    st.session_state["resumo_empresa_gerado"] = False
-                    if "resumo_empresa" in st.session_state:
-                        st.session_state["resumo_empresa"] = None
                     
                     # Calcular métricas com base nas médias
                     medias = calcular_medias(respostas_medias)
@@ -476,127 +476,127 @@ if st.session_state.get("modo_diagnostico_empresa", False):
                     st.session_state["empresa_medias"] = medias
                     st.session_state["empresa_rexp"] = rexp
                     st.session_state["empresa_zona"] = zona
+                    st.session_state["num_registros"] = num_registros
                     
-                    # Exibir resultados
-                    st.success(f"Rexp calculado: **{rexp}**")
-                    st.metric("Zona de Maturidade", zona)
-                    st.info(f"Dados agregados de {num_registros} diagnósticos da empresa '{empresa_nome}'")
-                    
-                    # Gráfico radar
-                    dimensoes = calcular_dimensoes(medias)
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatterpolar(
-                        r=list(dimensoes.values()),
-                        theta=list(dimensoes.keys()),
-                        fill='toself',
-                        name='Maturidade'
-                    ))
-                    fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0,1])), showlegend=False)
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Tabela de médias por variável
-                    st.subheader("Médias por Dimensão")
-                    df = pd.DataFrame([
-                        {"Variável": nomes_longos[k], "Média Ponderada (0-1)": v}
-                        for k, v in medias.items()
-                    ])
-                    st.dataframe(df, use_container_width=True)
-                    
-                    # Mostrar todos os sliders com as médias calculadas
-                    st.subheader("Detalhamento por Pergunta (Valores Médios)")
-                    
-                    tab_names = list(perguntas.keys())
-                    tabs = st.tabs(tab_names)
-                    
-                    for idx, var in enumerate(tab_names):
-                        with tabs[idx]:
-                            st.subheader(nomes_longos[var])
-                            st.info(ajuda[var])
-                            
-                            for i, (pergunta, _) in enumerate(perguntas[var]):
-                                media_nota, _ = respostas_medias[var][i]
-                                st.slider(
-                                    f"{i+1}. {pergunta}",
-                                    min_value=0.0,
-                                    max_value=5.0,
-                                    value=float(media_nota),
-                                    step=0.1,
-                                    key=f"media_{var}_{i}",
-                                    disabled=True  # Sliders bloqueados, apenas para visualização
-                                )
-                    
-                    # SOLUÇÃO FINAL: Botão direto sem estados complexos
-                    st.markdown("### Análise da Empresa")
-
-                    # Verificar se o resumo já existe
-                    resumo_atual = st.session_state.get("resumo_empresa")
-                    if resumo_atual:
-                        st.subheader("Análise Agregada da Empresa:")
-                        st.markdown(resumo_atual)
-                        
-                        # Botão para gerar novo resumo
-                        if st.button("Gerar Nova Análise"):
-                            # Remover o resumo existente
-                            st.session_state["resumo_empresa"] = None
-                            st.experimental_rerun()
-                    else:
-                        # Área para o resumo - criada antes do botão para evitar reordenação do layout
-                        resumo_container = st.container()
-                        
-                        # Botão para gerar resumo - colocado antes para aparecer primeiro
-                        if st.button("Gerar Resumo e Recomendações", key="btn_resumo_direto"):
-                            with st.spinner("Gerando análise completa..."):
-                                try:
-                                    # Verificamos explicitamente todos os dados necessários
-                                    if not respostas_medias or not medias or not rexp or not zona:
-                                        st.error("Dados incompletos para gerar análise.")
-                                        st.stop()
-                                    
-                                    # Carregamento e geração do resumo
-                                    with st.spinner("Carregando conhecimento DREXUS..."):
-                                        conhecimento_drexus = carregar_conhecimento_drexus()
-                                    
-                                    with st.spinner("Consultando OpenAI para análise..."):
-                                        resumo = gerar_resumo_openai(
-                                            empresa_nome, 
-                                            "Diagnóstico Agregado",
-                                            "N/A", 
-                                            respostas_medias,
-                                            medias, 
-                                            rexp,
-                                            zona,
-                                            conhecimento_drexus
-                                        )
-                                    
-                                    # Salvar resultado na sessão
-                                    st.session_state["resumo_empresa"] = resumo
-                                    
-                                    # Mostrar resultado imediatamente no container pré-criado
-                                    with resumo_container:
-                                        st.subheader("Análise Agregada da Empresa:")
-                                        st.markdown(resumo)
-                                        
-                                except Exception as e:
-                                    st.error(f"Erro ao gerar análise: {str(e)}")
-                                    st.code(traceback.format_exc())
-                                    st.info("Dica: verifique se a variável de ambiente OPENAI_API_KEY está configurada corretamente")
+                    # Marcar que a busca foi realizada com sucesso
+                    busca_realizada = True
         else:
             st.warning("Por favor, digite o nome da empresa.")
     
+    # Exibir resultados se existirem no estado da sessão
+    if "empresa_atual" in st.session_state and "empresa_medias" in st.session_state:
+        with resultado_container:
+            empresa_nome = st.session_state["empresa_atual"]
+            medias = st.session_state["empresa_medias"]
+            rexp = st.session_state["empresa_rexp"]
+            zona = st.session_state["empresa_zona"]
+            num_registros = st.session_state.get("num_registros", 0)
+            respostas_medias = st.session_state["respostas_medias"]
+            
+            # Exibir resultados
+            st.success(f"Rexp calculado: **{rexp}**")
+            st.metric("Zona de Maturidade", zona)
+            st.info(f"Dados agregados de {num_registros} diagnósticos da empresa '{empresa_nome}'")
+            
+            # Gráfico radar
+            dimensoes = calcular_dimensoes(medias)
+            fig = go.Figure()
+            fig.add_trace(go.Scatterpolar(
+                r=list(dimensoes.values()),
+                theta=list(dimensoes.keys()),
+                fill='toself',
+                name='Maturidade'
+            ))
+            fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0,1])), showlegend=False)
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Tabela de médias por variável
+            st.subheader("Médias por Dimensão")
+            df = pd.DataFrame([
+                {"Variável": nomes_longos[k], "Média Ponderada (0-1)": v}
+                for k, v in medias.items()
+            ])
+            st.dataframe(df, use_container_width=True)
+            
+            # Mostrar todos os sliders com as médias calculadas
+            st.subheader("Detalhamento por Pergunta (Valores Médios)")
+            
+            tab_names = list(perguntas.keys())
+            tabs = st.tabs(tab_names)
+            
+            for idx, var in enumerate(tab_names):
+                with tabs[idx]:
+                    st.subheader(nomes_longos[var])
+                    st.info(ajuda[var])
+                    
+                    for i, (pergunta, _) in enumerate(perguntas[var]):
+                        media_nota, _ = respostas_medias[var][i]
+                        st.slider(
+                            f"{i+1}. {pergunta}",
+                            min_value=0.0,
+                            max_value=5.0,
+                            value=float(media_nota),
+                            step=0.1,
+                            key=f"media_{var}_{i}",
+                            disabled=True  # Sliders bloqueados, apenas para visualização
+                        )
+            
+            # SOLUÇÃO FINAL: Seção de análise da empresa
+            st.markdown("### Análise da Empresa")
+            
+            # Verificar se o resumo já existe
+            if "resumo_empresa" in st.session_state and st.session_state["resumo_empresa"]:
+                st.subheader("Análise Agregada da Empresa:")
+                st.markdown(st.session_state["resumo_empresa"])
+                
+                # Botão para gerar novo resumo
+                if st.button("Gerar Nova Análise"):
+                    # Remover o resumo existente
+                    st.session_state["resumo_empresa"] = None
+            else:
+                # Botão para gerar resumo
+                if st.button("Gerar Resumo e Recomendações", key="btn_resumo_direto"):
+                    # Garantir que temos os dados necessários
+                    if not all([respostas_medias, medias, rexp, zona]):
+                        st.error("Dados incompletos para gerar análise.")
+                    else:
+                        with st.spinner("Gerando análise completa..."):
+                            try:
+                                # Carregar conhecimento e gerar resumo
+                                conhecimento_drexus = carregar_conhecimento_drexus()
+                                resumo = gerar_resumo_openai(
+                                    empresa_nome, 
+                                    "Diagnóstico Agregado",
+                                    "N/A", 
+                                    respostas_medias,
+                                    medias, 
+                                    rexp,
+                                    zona,
+                                    conhecimento_drexus
+                                )
+                                
+                                # Salvar o resumo no estado da sessão
+                                st.session_state["resumo_empresa"] = resumo
+                                
+                                # Exibir o resumo imediatamente
+                                with resumo_container:
+                                    st.subheader("Análise Agregada da Empresa:")
+                                    st.markdown(resumo)
+                            except Exception as e:
+                                st.error(f"Erro ao gerar análise: {str(e)}")
+                                st.code(traceback.format_exc())
+    
+    # Botão para voltar ao diagnóstico normal
     if st.button("Voltar ao Diagnóstico Normal"):
         st.session_state["modo_diagnostico_empresa"] = False
         # Limpar estados relacionados ao diagnóstico da empresa
-        if "empresa_atual" in st.session_state:
-            del st.session_state["empresa_atual"]
-        if "respostas_medias" in st.session_state:
-            del st.session_state["respostas_medias"]
-        if "resumo_empresa" in st.session_state:
-            st.session_state["resumo_empresa"] = None
-        st.session_state["resumo_empresa_gerado"] = False
-        if "gerar_resumo_clicado" in st.session_state:
-            del st.session_state["gerar_resumo_clicado"]
+        for key in list(st.session_state.keys()):
+            if key.startswith("media_") or key in ["empresa_atual", "respostas_medias", 
+                                                  "empresa_medias", "empresa_rexp", 
+                                                  "empresa_zona", "resumo_empresa"]:
+                del st.session_state[key]
         st.rerun()
-        
+    
     # Parar o fluxo normal do app
     st.stop()
 
@@ -625,7 +625,6 @@ if not st.session_state["iniciar_questionario"]:
 criar_tabelas()
 
 # Verifica se já existe diagnóstico:
-
 ultimo = buscar_ultimo_diagnostico(empresa, responsavel, matricula)
 
 if ultimo:
@@ -647,20 +646,17 @@ if ultimo:
         fig_last.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0,1])), showlegend=False)
         st.plotly_chart(fig_last, use_container_width=True)
 
-
 st.header("Novo Diagnóstico")
 
-# Depois de preencher o dicionário respostas com os sliders:
-# (mantém seu código anterior)
-
-tab_names = list(perguntas.keys())  # ["If", "Cm", "Et", "DREq", "Lc", "Im", "Pv"]
+# Preencher o dicionário respostas com os sliders
+tab_names = list(perguntas.keys())
 tabs = st.tabs(tab_names)
 
 respostas = {}
 
 for idx, var in enumerate(tab_names):
     with tabs[idx]:
-        st.subheader(nomes_longos[var])  # Nome longo APENAS dentro da aba
+        st.subheader(nomes_longos[var])
         st.info(ajuda[var])
         respostas[var] = []
         for i, (pergunta, peso) in enumerate(perguntas[var]):
@@ -678,39 +674,17 @@ for idx, var in enumerate(tab_names):
 
 # --- TRECHO QUE CONTROLA O BOTÃO ---
 
+# Pré-alocar contêineres para os resultados
+resultado_individual_container = st.container()
+resumo_individual_container = st.container()
+
+# Botão para calcular Rexp
 if st.button("Calcular Rexp", key="calcular_rexp_btn"):
     medias = calcular_medias(respostas)
     rexp = calcular_rexp(medias)
     zona = interpretar_rexp(rexp)
 
-    st.success(f"Rexp calculado: **{rexp}**")
-    st.metric("Zona de Maturidade", zona)
-    st.write("Média ponderada das variáveis:")
-    
-    for k, v in medias.items():
-        st.write(f"{nomes_longos[k]}: {v}")
-
-    dimensoes = calcular_dimensoes(medias)
-    fig = go.Figure()
-    fig.add_trace(go.Scatterpolar(
-        r=list(dimensoes.values()),
-        theta=list(dimensoes.keys()),
-        fill='toself',
-        name='Maturidade'
-    ))
-    
-    fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0,1])), showlegend=False)
-    st.plotly_chart(fig, use_container_width=True)
-
-    st.subheader("Tabela de Variáveis e Pesos")
-
-    df = pd.DataFrame([
-    {"Variável": nomes_longos[k], "Média Ponderada (0-1)": v}
-    for k, v in medias.items()
-    ])
-    st.dataframe(df, use_container_width=True)
-
-    st.session_state["resumo_gerado"] = False
+    # Salvar dados no estado da sessão
     st.session_state["dados_resultado"] = {
         "empresa": empresa,
         "responsavel": responsavel,
@@ -721,33 +695,61 @@ if st.button("Calcular Rexp", key="calcular_rexp_btn"):
         "zona": zona
     }
 
-# Só mostra botão de resumo se já calculou e não gerou ainda
-# Aplicando a mesma solução direta para o diagnóstico individual
-if st.session_state.get("dados_resultado") and not st.session_state.get("resumo_gerado", False):
-    # Área para o resumo - criada antes do botão para evitar reordenação do layout
-    resumo_individual_container = st.container()
-    
-    # Botão direto para gerar resumo individual
+    with resultado_individual_container:
+        st.success(f"Rexp calculado: **{rexp}**")
+        st.metric("Zona de Maturidade", zona)
+        st.write("Média ponderada das variáveis:")
+        
+        for k, v in medias.items():
+            st.write(f"{nomes_longos[k]}: {v}")
+
+        dimensoes = calcular_dimensoes(medias)
+        fig = go.Figure()
+        fig.add_trace(go.Scatterpolar(
+            r=list(dimensoes.values()),
+            theta=list(dimensoes.keys()),
+            fill='toself',
+            name='Maturidade'
+        ))
+        
+        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0,1])), showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.subheader("Tabela de Variáveis e Pesos")
+
+        df = pd.DataFrame([
+        {"Variável": nomes_longos[k], "Média Ponderada (0-1)": v}
+        for k, v in medias.items()
+        ])
+        st.dataframe(df, use_container_width=True)
+        
+        st.session_state["resumo_gerado"] = False
+
+# Verificar se já temos os dados do resultado para mostrar o botão de resumo
+dados_resultado = st.session_state.get("dados_resultado")
+if dados_resultado and not st.session_state.get("resumo_gerado", False):
+    # Mostrar o botão de resumo individual
     if st.button("Gerar Resumo e Recomendações Personalizadas", key="btn_resumo_individual"):
         with st.spinner("Gerando análise e recomendações..."):
             try:
-                dados = st.session_state["dados_resultado"]
+                # Carregar conhecimento e gerar resumo
                 conhecimento_drexus = carregar_conhecimento_drexus()
                 resumo = gerar_resumo_openai(
-                    dados["empresa"],
-                    dados["responsavel"],
-                    dados["matricula"],
-                    dados["respostas"],
-                    dados["medias"],
-                    dados["rexp"],
-                    dados["zona"],
+                    dados_resultado["empresa"],
+                    dados_resultado["responsavel"],
+                    dados_resultado["matricula"],
+                    dados_resultado["respostas"],
+                    dados_resultado["medias"],
+                    dados_resultado["rexp"],
+                    dados_resultado["zona"],
                     conhecimento_drexus
                 )
                 
+                # Salvar o resumo no estado da sessão
                 st.session_state["resumo"] = resumo
                 st.session_state["resumo_gerado"] = True
                 
-                # Mostrar resultado imediatamente no container pré-criado
+                # Exibir o resumo imediatamente
                 with resumo_individual_container:
                     st.subheader("Resumo personalizado da situação da empresa:")
                     st.markdown(resumo)
@@ -755,31 +757,29 @@ if st.session_state.get("dados_resultado") and not st.session_state.get("resumo_
                 st.error(f"Erro ao gerar resumo: {str(e)}")
                 st.code(traceback.format_exc())
 
-if st.session_state.get("resumo_gerado", False):
-    st.subheader("Resumo personalizado da situação da empresa:")
-    st.markdown(st.session_state["resumo"])
-    if st.button("Gravar diagnóstico no banco de dados"):
-        dados = st.session_state["dados_resultado"]
-        salvar_diagnostico(dados["empresa"], dados["responsavel"], dados["matricula"], dados["respostas"])
-        st.success("Diagnóstico salvo com sucesso!")
-        # Não limpar estado automaticamente para permitir visualização do resumo
-        if st.button("Limpar e iniciar novo diagnóstico"):
-            st.session_state["resumo_gerado"] = False
-            st.session_state["dados_resultado"] = None
-            if "resumo" in st.session_state:
-                del st.session_state["resumo"]
-            st.rerun()
+# Mostrar o resumo se já foi gerado
+if st.session_state.get("resumo_gerado", False) and "resumo" in st.session_state:
+    with resumo_individual_container:
+        st.subheader("Resumo personalizado da situação da empresa:")
+        st.markdown(st.session_state["resumo"])
+        
+        if st.button("Gravar diagnóstico no banco de dados"):
+            dados = st.session_state["dados_resultado"]
+            salvar_diagnostico(dados["empresa"], dados["responsavel"], dados["matricula"], dados["respostas"])
+            st.success("Diagnóstico salvo com sucesso!")
 
 # Botão para resetar tudo e voltar ao início
 if st.button("Novo Diagnóstico"):
+    # Limpar todos os estados relacionados ao diagnóstico individual
     for var, lista_perguntas in perguntas.items():
         for i in range(len(lista_perguntas)):
             slider_key = f"{var}_{i}"
             if slider_key in st.session_state:
                 del st.session_state[slider_key]
-    st.session_state["iniciar_questionario"] = False
-    st.session_state["resumo_gerado"] = False
-    st.session_state["dados_resultado"] = None
-    if "resumo" in st.session_state:
-        del st.session_state["resumo"]
+    
+    keys_to_clear = ["iniciar_questionario", "resumo_gerado", "dados_resultado", "resumo"]
+    for key in keys_to_clear:
+        if key in st.session_state:
+            del st.session_state[key]
+    
     st.rerun()
