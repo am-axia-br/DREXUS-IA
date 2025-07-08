@@ -434,6 +434,31 @@ def interpretar_rexp(rexp):
     else:
         return "Fragilidade Total"
 
+def gerar_resumo_empresa(empresa_nome, respostas_medias, medias, rexp, zona):
+    """Função para gerar resumo da empresa sem conflitos de estado"""
+    try:
+        st.info("Carregando conhecimento DREXUS...")
+        conhecimento_drexus = carregar_conhecimento_drexus()
+        
+        st.info("Consultando OpenAI para análise...")
+        resumo = gerar_resumo_openai(
+            empresa_nome,
+            "Diagnóstico Agregado",
+            "N/A",
+            respostas_medias,
+            medias,
+            rexp,
+            zona,
+            conhecimento_drexus
+        )
+        
+        # Retornar o resumo gerado
+        return resumo
+    except Exception as e:
+        st.error(f"Erro ao gerar análise: {str(e)}")
+        st.code(traceback.format_exc())
+        return f"Erro na geração do resumo: {str(e)}"
+
 # ---------- INTERFACE PRINCIPAL ----------
 
 autenticar()
@@ -441,6 +466,14 @@ autenticar()
 # Modo Diagnóstico da Empresa
 if "modo_diagnostico_empresa" not in st.session_state:
     st.session_state["modo_diagnostico_empresa"] = False
+
+# Inicializar outras variáveis de estado para o diagnóstico da empresa
+if "resumo_empresa" not in st.session_state:
+    st.session_state["resumo_empresa"] = None
+
+# Função para lidar com o clique do botão de gerar resumo
+def clicar_gerar_resumo():
+    st.session_state["gerar_resumo_clicado"] = True
 
 if st.session_state.get("modo_diagnostico_empresa", False):
     st.title("Diagnóstico Agregado da Empresa")
@@ -461,7 +494,7 @@ if st.session_state.get("modo_diagnostico_empresa", False):
                     # Reset do estado do resumo quando buscamos novos dados
                     st.session_state["resumo_empresa_gerado"] = False
                     if "resumo_empresa" in st.session_state:
-                        del st.session_state["resumo_empresa"]
+                        st.session_state["resumo_empresa"] = None
                     
                     # Calcular métricas com base nas médias
                     medias = calcular_medias(respostas_medias)
@@ -521,58 +554,53 @@ if st.session_state.get("modo_diagnostico_empresa", False):
                                     disabled=True  # Sliders bloqueados, apenas para visualização
                                 )
                     
-                    # CORREÇÃO PRINCIPAL: Substituição do formulário por um botão direto
+                    # CORREÇÃO PRINCIPAL: Seção de análise da empresa com solução robusta
                     st.markdown("### Análise da Empresa")
                     
-                    # Verificamos se já existe um resumo gerado
-                    if "resumo_empresa" in st.session_state:
+                    # Inicializar variável de estado para controlar o clique do botão
+                    if "gerar_resumo_clicado" not in st.session_state:
+                        st.session_state["gerar_resumo_clicado"] = False
+                    
+                    # Se já temos um resumo, mostrá-lo
+                    if st.session_state["resumo_empresa"] is not None:
                         st.subheader("Análise Agregada da Empresa:")
                         st.markdown(st.session_state["resumo_empresa"])
                         
-                        # Botão para gerar novo resumo
+                        # Botão para gerar nova análise
                         if st.button("Gerar Nova Análise"):
-                            # Remover o resumo existente
-                            del st.session_state["resumo_empresa"]
-                            st.session_state["resumo_empresa_gerado"] = False
+                            st.session_state["resumo_empresa"] = None
+                            st.session_state["gerar_resumo_clicado"] = False
                             st.rerun()
+                    
+                    # Se o botão foi clicado, gerar o resumo
+                    elif st.session_state["gerar_resumo_clicado"]:
+                        with st.spinner("Gerando análise completa..."):
+                            resumo = gerar_resumo_empresa(
+                                empresa_nome,
+                                respostas_medias,
+                                medias,
+                                rexp,
+                                zona
+                            )
+                            
+                            # Salvar o resumo no estado da sessão e exibi-lo
+                            st.session_state["resumo_empresa"] = resumo
+                            st.session_state["resumo_empresa_gerado"] = True
+                            st.subheader("Análise Agregada da Empresa:")
+                            st.markdown(resumo)
+                    
+                    # Se não há resumo e o botão não foi clicado, mostrar o botão
                     else:
-                        # Botão DIRETO, sem formulário
-                        if st.button("Gerar Resumo e Recomendações", key="btn_resumo_direto"):
-                            try:
-                                with st.spinner("Gerando análise completa..."):
-                                    # Verificamos explicitamente todos os dados necessários
-                                    if not respostas_medias or not medias or not rexp or not zona:
-                                        st.error("Dados incompletos para gerar análise.")
-                                        st.stop()
-                                    
-                                    # Log para depuração
-                                    st.info("Carregando conhecimento DREXUS...")
-                                    conhecimento_drexus = carregar_conhecimento_drexus()
-                                    
-                                    st.info("Consultando OpenAI para análise...")
-                                    resumo = gerar_resumo_openai(
-                                        empresa_nome, 
-                                        "Diagnóstico Agregado",
-                                        "N/A", 
-                                        respostas_medias,
-                                        medias, 
-                                        rexp,
-                                        zona,
-                                        conhecimento_drexus
-                                    )
-                                    
-                                    # Salvar resultado na sessão
-                                    st.session_state["resumo_empresa"] = resumo
-                                    st.session_state["resumo_empresa_gerado"] = True
-                                    
-                                    # Mostrar resultado imediatamente
-                                    st.subheader("Análise Agregada da Empresa:")
-                                    st.markdown(resumo)
-                                    
-                            except Exception as e:
-                                st.error(f"Erro ao gerar análise: {str(e)}")
-                                st.code(traceback.format_exc())
-                                st.info("Dica: verifique se a variável de ambiente OPENAI_API_KEY está configurada corretamente")
+                        # Botão centralizado para melhor UX
+                        col1, col2, col3 = st.columns([1, 2, 1])
+                        with col2:
+                            # Usar botão simples com callback para melhorar a confiabilidade
+                            if st.button("Gerar Resumo e Recomendações", 
+                                       key="btn_resumo_empresa", 
+                                       on_click=clicar_gerar_resumo,
+                                       use_container_width=True):
+                                # Este código não será executado porque usamos on_click
+                                pass
         else:
             st.warning("Por favor, digite o nome da empresa.")
     
@@ -584,8 +612,10 @@ if st.session_state.get("modo_diagnostico_empresa", False):
         if "respostas_medias" in st.session_state:
             del st.session_state["respostas_medias"]
         if "resumo_empresa" in st.session_state:
-            del st.session_state["resumo_empresa"]
+            st.session_state["resumo_empresa"] = None
         st.session_state["resumo_empresa_gerado"] = False
+        if "gerar_resumo_clicado" in st.session_state:
+            del st.session_state["gerar_resumo_clicado"]
         st.rerun()
         
     # Parar o fluxo normal do app
@@ -712,30 +742,53 @@ if st.button("Calcular Rexp", key="calcular_rexp_btn"):
         "zona": zona
     }
 
+# Função para lidar com o clique do botão de resumo individual
+def clicar_gerar_resumo_individual():
+    st.session_state["gerar_resumo_individual_clicado"] = True
+
 # Só mostra botão de resumo se já calculou e não gerou ainda
-# Também substituindo o formulário por um botão direto no diagnóstico individual
-if st.session_state.get("dados_resultado") and not st.session_state["resumo_gerado"]:
-    if st.button("Gerar Resumo e Recomendações Personalizadas", key="btn_resumo_individual"):
+# Usando a mesma abordagem robusta para o resumo individual
+if st.session_state.get("dados_resultado") and not st.session_state.get("resumo_gerado", False):
+    # Inicializar variável de estado para o botão individual
+    if "gerar_resumo_individual_clicado" not in st.session_state:
+        st.session_state["gerar_resumo_individual_clicado"] = False
+    
+    # Se o botão foi clicado, gerar o resumo
+    if st.session_state["gerar_resumo_individual_clicado"]:
         with st.spinner("Gerando análise e recomendações..."):
             dados = st.session_state["dados_resultado"]
             conhecimento_drexus = carregar_conhecimento_drexus()
-            resumo = gerar_resumo_openai(
-                dados["empresa"],
-                dados["responsavel"],
-                dados["matricula"],
-                dados["respostas"],
-                dados["medias"],
-                dados["rexp"],
-                dados["zona"],
-                conhecimento_drexus
-            )
-            
-            st.session_state["resumo"] = resumo
-            st.session_state["resumo_gerado"] = True
-            
-            # Mostrar resultado imediatamente
-            st.subheader("Resumo personalizado da situação da empresa:")
-            st.markdown(resumo)
+            try:
+                resumo = gerar_resumo_openai(
+                    dados["empresa"],
+                    dados["responsavel"],
+                    dados["matricula"],
+                    dados["respostas"],
+                    dados["medias"],
+                    dados["rexp"],
+                    dados["zona"],
+                    conhecimento_drexus
+                )
+                
+                st.session_state["resumo"] = resumo
+                st.session_state["resumo_gerado"] = True
+                
+                # Mostrar resultado imediatamente
+                st.subheader("Resumo personalizado da situação da empresa:")
+                st.markdown(resumo)
+            except Exception as e:
+                st.error(f"Erro ao gerar resumo: {str(e)}")
+                st.code(traceback.format_exc())
+    else:
+        # Botão centralizado
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("Gerar Resumo e Recomendações Personalizadas", 
+                       key="btn_resumo_individual",
+                       on_click=clicar_gerar_resumo_individual,
+                       use_container_width=True):
+                # Este código não será executado porque usamos on_click
+                pass
 
 if st.session_state.get("resumo_gerado", False):
     st.subheader("Resumo personalizado da situação da empresa:")
@@ -748,6 +801,8 @@ if st.session_state.get("resumo_gerado", False):
         if st.button("Limpar e iniciar novo diagnóstico"):
             st.session_state["resumo_gerado"] = False
             st.session_state["dados_resultado"] = None
+            if "gerar_resumo_individual_clicado" in st.session_state:
+                del st.session_state["gerar_resumo_individual_clicado"]
             st.rerun()
 
 # Botão para resetar tudo e voltar ao início
@@ -760,5 +815,8 @@ if st.button("Novo Diagnóstico"):
     st.session_state["iniciar_questionario"] = False
     st.session_state["resumo_gerado"] = False
     st.session_state["dados_resultado"] = None
-    st.session_state["resumo"] = ""
+    if "resumo" in st.session_state:
+        del st.session_state["resumo"]
+    if "gerar_resumo_individual_clicado" in st.session_state:
+        del st.session_state["gerar_resumo_individual_clicado"]
     st.rerun()
